@@ -52,7 +52,7 @@
 
 从`docs/实验状态机设计.md`提取并去重`LS-*`及`ENT/S1—S6/HLP/ERR/END-*`编号；预期生命周期状态15、转换54、Mermaid 3。
 
-- [ ] **Step 4: 提交并推送整改分支**
+- [x] **Step 4: 提交并推送整改分支**
 
 只暂存计划与本任务文档，排除`.claude/`。提交信息：`关闭GAP-003并完成G1阻断整改`。推送`ai-ds/g1-blocker-remediation`。
 
@@ -61,22 +61,22 @@
 **Files:**
 - Verify: Git refs and commit graph
 
-- [ ] **Step 1: 刷新远程引用**
+- [x] **Step 1: 刷新远程引用**
 
 运行`git fetch --prune origin`；预期成功且无未处理冲突。
 
-- [ ] **Step 2: 审查全部远程分支**
+- [x] **Step 2: 审查全部远程分支**
 
 对`refs/remotes/origin`每个分支执行祖先检查；除整改分支外，预期所有功能分支头均为整改分支祖先。若存在未包含分支，停止合并并先审查差异。
 
-- [ ] **Step 3: 验证main可快进**
+- [x] **Step 3: 验证main可快进**
 
 确认工作区除用户既有`.claude/`外无改动，且`origin/main`是整改分支祖先。预期`git merge-base --is-ancestor origin/main ai-ds/g1-blocker-remediation`成功。
 
-- [ ] **Step 4: 快进本地main**
+- [x] **Step 4: 快进本地main**
 
 切换`main`，以`git merge --ff-only ai-ds/g1-blocker-remediation`合并。任何非快进结果均停止，不创建隐式合并提交。
 
-- [ ] **Step 5: 合并后复验并推送**
+- [x] **Step 5: 合并后复验并推送**
 
 复查15状态、54转换、Markdown表格、`git diff --check`和提交图；全部通过后运行`git push origin main`。不创建Pull Request。
