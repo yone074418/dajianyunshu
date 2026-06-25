@@ -12,9 +12,11 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\" eslint.config.js playwright.config.ts vitest.config.ts vite.config.ts package.json .prettierrc.json docs/day16-quality-tooling-verification.md docs/day17-routing-layout-verification.md docs/day18-zustand-session-state-verification.md docs/day19-domain-types-zod-validation-verification.md",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "verify:supabase-env": "node scripts/verify-supabase-env.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.4",
