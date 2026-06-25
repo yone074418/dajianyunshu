@@ -12,7 +12,8 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\" eslint.config.js playwright.config.ts vitest.config.ts vite.config.ts package.json .prettierrc.json docs/day16-quality-tooling-verification.md docs/day17-routing-layout-verification.md docs/day18-zustand-session-state-verification.md docs/day19-domain-types-zod-validation-verification.md",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "verify:db-migrations": "node scripts/verify-db-migrations.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
