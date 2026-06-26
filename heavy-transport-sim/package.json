@@ -14,7 +14,8 @@
     "test:run": "vitest run",
     "test:e2e": "playwright test",
     "verify:supabase-env": "node scripts/verify-supabase-env.mjs",
-    "verify:db-migrations": "node scripts/verify-db-migrations.mjs"
+    "verify:db-migrations": "node scripts/verify-db-migrations.mjs",
+    "verify:rls-policies": "node scripts/verify-rls-policies.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
