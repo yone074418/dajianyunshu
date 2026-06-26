@@ -6,6 +6,7 @@ import LoginPage from '../pages/login/LoginPage'
 import NotFoundPage from '../pages/not-found/NotFoundPage'
 import ForbiddenPage from '../pages/forbidden/ForbiddenPage'
 import SessionExpiredPage from '../pages/session-expired/SessionExpiredPage'
+import ExperimentPage from '../pages/experiment/ExperimentPage'
 import AuthGuard from './AuthGuard'
 import RoleGuard from './RoleGuard'
 
@@ -36,6 +37,16 @@ export const router = createBrowserRouter([
           <AuthGuard>
             <RoleGuard>
               <StudentPage />
+            </RoleGuard>
+          </AuthGuard>
+        ),
+      },
+      {
+        path: 'student/experiment',
+        element: (
+          <AuthGuard>
+            <RoleGuard>
+              <ExperimentPage />
             </RoleGuard>
           </AuthGuard>
         ),

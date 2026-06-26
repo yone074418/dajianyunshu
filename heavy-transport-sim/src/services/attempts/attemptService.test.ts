@@ -382,4 +382,84 @@ describe('AttemptService', () => {
       expect(second.steps[0].status).toBe('available')
     })
   })
+
+  describe('error scenarios', () => {
+    it('should log access_denied when wrong student tries to continue', async () => {
+      const created = await createAttemptForStudent({
+        studentId: 'student-1',
+        caseId: 'case-1',
+      })
+
+      try {
+        await continueAttempt({
+          studentId: 'student-2',
+          attemptId: created.attempt.id,
+        })
+      } catch {
+        // expected
+      }
+
+      const logs = getLogs()
+      const deniedLog = logs.find(
+        (l) => l.eventType === 'attempt_access_denied',
+      )
+      expect(deniedLog).toBeTruthy()
+      expect(deniedLog!.studentId).toBe('student-2')
+    })
+
+    it('should log access_denied when wrong student tries to save', async () => {
+      const created = await createAttemptForStudent({
+        studentId: 'student-1',
+        caseId: 'case-1',
+      })
+
+      try {
+        await saveAttemptStep({
+          studentId: 'student-2',
+          attemptId: created.attempt.id,
+          stepId: created.steps[0].id,
+          status: 'completed',
+        })
+      } catch {
+        // expected
+      }
+
+      const logs = getLogs()
+      const deniedLog = logs.find(
+        (l) => l.eventType === 'attempt_access_denied',
+      )
+      expect(deniedLog).toBeTruthy()
+    })
+
+    it('should not allow saving a locked step', async () => {
+      const created = await createAttemptForStudent({
+        studentId: 'student-1',
+        caseId: 'case-1',
+      })
+
+      await expect(
+        saveAttemptStep({
+          studentId: 'student-1',
+          attemptId: created.attempt.id,
+          stepId: created.steps[2].id,
+          status: 'completed',
+        }),
+      ).rejects.toThrow('STEP_IS_LOCKED')
+    })
+
+    it('should handle attempt not found gracefully', async () => {
+      await expect(
+        continueAttempt({ studentId: 'student-1', attemptId: 'fake-id' }),
+      ).rejects.toThrow('ATTEMPT_NOT_FOUND')
+
+      await expect(
+        saveAttemptStep({
+          studentId: 'student-1',
+          attemptId: 'fake-id',
+          stepId: 'fake-step',
+          status: 'completed',
+        }),
+      ).rejects.toThrow('ATTEMPT_NOT_FOUND')
+    })
+  })
 })

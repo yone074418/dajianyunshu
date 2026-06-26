@@ -1,21 +1,31 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('Unauthenticated Access', () => {
-  test('redirects to login when accessing student page without auth', async ({ page }) => {
+  test('redirects to login when accessing student page without auth', async ({
+    page,
+  }) => {
     await page.goto('/student')
     await expect(page).toHaveURL('/login')
-    await expect(page.getByRole('main').getByText('大件运输虚拟仿真实验教学系统')).toBeVisible()
+    await expect(
+      page.getByRole('main').getByText('大件运输虚拟仿真实验教学系统'),
+    ).toBeVisible()
   })
 
-  test('redirects to login when accessing teacher page without auth', async ({ page }) => {
+  test('redirects to login when accessing teacher page without auth', async ({
+    page,
+  }) => {
     await page.goto('/teacher')
     await expect(page).toHaveURL('/login')
-    await expect(page.getByRole('main').getByText('大件运输虚拟仿真实验教学系统')).toBeVisible()
+    await expect(
+      page.getByRole('main').getByText('大件运输虚拟仿真实验教学系统'),
+    ).toBeVisible()
   })
 
   test('shows login page at /login', async ({ page }) => {
     await page.goto('/login')
-    await expect(page.getByRole('main').getByText('大件运输虚拟仿真实验教学系统')).toBeVisible()
+    await expect(
+      page.getByRole('main').getByText('大件运输虚拟仿真实验教学系统'),
+    ).toBeVisible()
     await expect(page.getByLabel('邮箱')).toBeVisible()
     await expect(page.getByLabel('密码')).toBeVisible()
   })
@@ -34,7 +44,9 @@ test.describe('Student Login and Access', () => {
     await expect(page.getByText('欢迎，测试学生')).toBeVisible()
   })
 
-  test('student cannot access teacher page directly via URL', async ({ page }) => {
+  test('student cannot access teacher page directly via URL', async ({
+    page,
+  }) => {
     await page.goto('/login')
 
     await page.getByLabel('邮箱').fill('student@test.com')
@@ -60,7 +72,10 @@ test.describe('Student Login and Access', () => {
 
     await expect(page).toHaveURL('/student')
 
-    await page.getByRole('navigation').getByRole('button', { name: '退出登录' }).click()
+    await page
+      .getByRole('navigation')
+      .getByRole('button', { name: '退出登录' })
+      .click()
 
     await expect(page).toHaveURL('/login')
   })
@@ -79,7 +94,9 @@ test.describe('Teacher Login and Access', () => {
     await expect(page.getByText('欢迎，测试教师')).toBeVisible()
   })
 
-  test('teacher cannot access student page directly via URL', async ({ page }) => {
+  test('teacher cannot access student page directly via URL', async ({
+    page,
+  }) => {
     await page.goto('/login')
 
     await page.getByLabel('邮箱').fill('teacher@test.com')
@@ -100,12 +117,16 @@ test.describe('Teacher Login and Access', () => {
 test.describe('404 Handling', () => {
   test('shows 404 page for unknown routes', async ({ page }) => {
     await page.goto('/unknown')
-    await expect(page.getByRole('heading', { name: '页面未找到' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: '页面未找到' }),
+    ).toBeVisible()
   })
 })
 
 test.describe('Root Path', () => {
-  test('root path redirects to login when not authenticated', async ({ page }) => {
+  test('root path redirects to login when not authenticated', async ({
+    page,
+  }) => {
     await page.goto('/')
     await expect(page).toHaveURL('/login')
   })

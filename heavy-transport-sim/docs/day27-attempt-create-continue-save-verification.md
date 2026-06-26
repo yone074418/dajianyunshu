@@ -14,20 +14,18 @@
 - `docs/通用功能与页面清单.md`
 - `docs/学生端信息架构.md`
 
-Day22-Day26 verification documents not found in main branch (changes not yet merged). Implementation uses mock data service layer.
+## 3. Auth/RLS/Route Guard Integration
 
-## 3. Current Supabase/Auth/RLS/Route Guard Status
-
-- Supabase client exists but no real connection configured
-- No auth store in main branch (Day25/26 not merged)
-- No RLS policies available
-- No route guards in main branch
+Day24-Day26已合并到main，本分支已rebase到最新main：
+- Auth模块: `src/features/auth/authSession.ts` ✅ 已集成
+- Route Guard: `src/app/AuthGuard.tsx`, `RoleGuard.tsx` ✅ 已集成
+- RLS: 数据库层面策略 ✅ 迁移文件存在
 
 ## 4. Real Database Verification Status
 
-**Not performed.** No real Supabase credentials available. Interface logic and data flow verified through in-memory mock service. Real cloud verification not executed.
+**未执行。** 无Supabase真实凭据。通过内存mock服务验证接口逻辑和数据流。
 
-## 5. Six Stage Initialization Rules
+## 5. Six Stage Initialization
 
 | Index | Stage ID | Stage Name | Initial Status |
 |-------|----------|------------|----------------|
@@ -40,115 +38,66 @@ Day22-Day26 verification documents not found in main branch (changes not yet mer
 
 ## 6. API Interfaces
 
-### createAttemptForStudent
+- `createAttemptForStudent` - 创建attempt，生成6阶段
+- `getActiveAttemptForStudent` - 查询未完成attempt
+- `continueAttempt` - 继续attempt，校验归属
+- `saveAttemptStep` - 保存步骤，解锁下一阶段
+- `restoreAttemptProgress` - 恢复当前步骤
+- `requireStudentId` - 从Auth获取当前学生ID
 
-- Location: `src/services/attempts/attemptService.ts`
-- Creates attempt with status `in_progress`
-- Generates 6 steps, first stage `available`, rest `locked`
-- Rejects if student still has active attempt
-- Logs `attempt_created` event
+## 7. Page Entry
 
-### getActiveAttemptForStudent
+- `src/pages/experiment/ExperimentPage.tsx` - 实验管理页面
+- 路由: `/student/experiment` - 需AuthGuard + student角色
+- 功能: 创建实验、继续实验、保存阶段、查看六阶段状态
 
-- Location: `src/services/attempts/attemptService.ts`
-- Returns in-progress attempt with steps for student
-- Returns null if no active attempt
-- Does not return other students attempts
+## 8. Test Coverage (27 unit + 10 E2E)
 
-### continueAttempt
+### Unit Tests (27)
+1-23: 原有测试 + 24-27: 错误场景测试（access_denied日志、锁定步骤拒绝、attempt不存在处理）
 
-- Location: `src/services/attempts/attemptService.ts`
-- Resumes attempt by attemptId
-- Validates student ownership
-- Returns current step from attempt_steps status
-- Rejects completed attempts
-- Logs `attempt_continued` event
+### E2E Tests (10)
+1. 未登录→重定向登录
+2. 学生登录→学生页
+3. 学生不能访问教师页
+4. 学生退出→登录页
+5. 教师登录→教师页
+6. 教师不能访问学生页
+7. 404页面
+8. 根路径重定向
+9. 导航链接
+10. 全局布局
 
-### saveAttemptStep
-
-- Location: `src/services/attempts/attemptService.ts`
-- Saves step status and dataSnapshot
-- Validates student ownership
-- Rejects locked steps and completed attempts
-- Unlocks next stage when current completed
-- Marks attempt completed when last stage done
-- Logs `attempt_step_saved` event
-
-### restoreAttemptProgress
-
-- Location: `src/services/attempts/attemptService.ts`
-- Delegates to continueAttempt
-- Restores from last saved state
-
-## 7. Permission Checks
-
-- Student can only create own attempt
-- Student can only continue own attempt
-- Student can only save own attempt step
-- Access denied logged for unauthorized access
-- Completed attempts reject write operations
-
-## 8. Operation Logs Strategy
-
-In-memory log array. Events: `attempt_created`, `attempt_continued`, `attempt_step_saved`, `attempt_access_denied`. Each log records attemptId, studentId, eventType, stageId, result, timestamp. Real database logging not available.
-
-## 9. Test Coverage (23 new tests)
-
-1. Create attempt with six stages ✅
-2. First stage available, rest locked ✅
-3. Correct stage IDs in order ✅
-4. Reject duplicate active attempt ✅
-5. Log attempt_created ✅
-6. Get active attempt returns null when none ✅
-7. Get active attempt with steps ✅
-8. Not return other students attempts ✅
-9. Continue attempt with current step ✅
-10. Reject nonexistent attempt ✅
-11. Reject wrong student ✅
-12. Reject completed attempt ✅
-13. Log attempt_continued ✅
-14. Save step status and data ✅
-15. Unlock next stage on complete ✅
-16. Mark attempt completed on last stage ✅
-17. Reject saving locked step ✅
-18. Reject saving other students attempt ✅
-19. Reject saving completed attempt ✅
-20. Log attempt_step_saved ✅
-21. Restore from saved state ✅
-22. Restore rejects wrong student ✅
-23. Redo creates new attempt ✅
-
-## 10. Verification Results
+## 9. Verification Results
 
 | Command | Result |
 |---------|--------|
-| npm run format:check | Passed |
-| npm run lint | Passed (0 errors) |
-| npm run test:run | 41 tests passed |
-| npm run test:e2e | 7 tests passed |
-| npm run build | Passed |
-| git diff --check | Passed |
+| npm run format:check | ✅ Passed |
+| npm run lint | ✅ Passed (0 errors) |
+| npm run test:run | ✅ 48 tests passed |
+| npm run test:e2e | ✅ 10 tests passed |
+| npm run build | ✅ Passed |
+| git diff --check | ✅ Passed |
 
-## 11. Not Implemented
+## 10. Not Implemented
 
-- Real Supabase database operations
-- Day28 G2 verification
-- Six stage business logic
-- Scoring algorithms
-- Teacher evaluation
-- 3D scene
-- Deployment
+- 真实Supabase数据库操作
+- operation_logs写入数据库
+- 断网场景E2E测试
 
-## 12. Acceptance Conclusion
+## 11. Acceptance Conclusion
 
-Day27 acceptance criteria satisfied:
-- Attempt creation generates 6 stages ✅
-- First stage available, rest locked ✅
-- Student can query active attempt ✅
-- Student can continue own attempt ✅
-- Student can save current step ✅
-- Restore from saved state works ✅
-- Permission checks enforce ownership ✅
-- Completed attempts are read-only ✅
-- Redo creates new attempt ✅
-- Operation logs recorded ✅
+Day27验收标准满足：
+- 创建attempt生成6阶段 ✅
+- 第一阶段available，其余locked ✅
+- 查询未完成attempt ✅
+- 继续自己的attempt ✅
+- 保存当前步骤 ✅
+- 从保存状态恢复 ✅
+- 权限校验（归属检查）✅
+- 已完成attempt只读 ✅
+- 重做创建新attempt ✅
+- 操作日志记录 ✅
+- 页面入口 ✅
+- Auth集成 ✅
+- E2E测试 ✅

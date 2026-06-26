@@ -8,6 +8,9 @@ import {
   type StepStatus,
   STAGE_IDS,
 } from '../../types/attempt'
+import { getCurrentProfile } from '../../features/auth/authSession'
+
+export type { AttemptWithSteps, AttemptResumeState }
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 15)
@@ -47,6 +50,14 @@ export function clearAll(): void {
   attempts.clear()
   steps.clear()
   logs.length = 0
+}
+
+export async function requireStudentId(): Promise<string> {
+  const profile = await getCurrentProfile()
+  if (!profile || profile.role !== 'student') {
+    throw new Error('AUTH_REQUIRED')
+  }
+  return profile.id
 }
 
 export async function createAttemptForStudent(input: {
@@ -230,4 +241,14 @@ export async function restoreAttemptProgress(input: {
   attemptId: string
 }): Promise<AttemptResumeState> {
   return continueAttempt(input)
+}
+
+export async function simulateNetworkError(): Promise<never> {
+  addLog('system', 'system', 'attempt_save_failed', null, 'network_error')
+  throw new Error('NETWORK_ERROR')
+}
+
+export async function simulateDbError(): Promise<never> {
+  addLog('system', 'system', 'attempt_save_failed', null, 'db_error')
+  throw new Error('DB_ERROR')
 }
