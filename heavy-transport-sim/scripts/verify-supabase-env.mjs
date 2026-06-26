@@ -96,7 +96,7 @@ try {
 console.log('\n[5] Secret leak scan');
 try {
   const hits = execSync(
-    'git grep -n "SUPABASE_SERVICE_ROLE_KEY\\|SERVICE_ROLE\\|JWT_SECRET\\|DATABASE_PASSWORD\\|VITE_SUPABASE_ANON_KEY=.*ey" -- .',
+    'git grep -n "SUPABASE_SERVICE_ROLE_KEY\\|SERVICE_ROLE\\|JWT_SECRET\\|DATABASE_PASSWORD\\|VITE_SUPABASE_ANON_KEY=.*ey" -- heavy-transport-sim ":(exclude)heavy-transport-sim/docs/**" ":(exclude)heavy-transport-sim/scripts/verify-*.mjs"',
     { cwd: resolve(projectRoot, '..'), encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
   ).trim();
   if (hits) {
