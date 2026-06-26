@@ -15,7 +15,8 @@
     "test:e2e": "playwright test",
     "verify:supabase-env": "node scripts/verify-supabase-env.mjs",
     "verify:db-migrations": "node scripts/verify-db-migrations.mjs",
-    "verify:rls-policies": "node scripts/verify-rls-policies.mjs"
+    "verify:rls-policies": "node scripts/verify-rls-policies.mjs",
+    "verify:g2": "node scripts/verify-g2-foundation.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
