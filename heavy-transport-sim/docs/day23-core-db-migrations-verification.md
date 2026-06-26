@@ -189,7 +189,25 @@ Verification PASSED.
 
 ## 16. Real Database Migration
 
-**Not executed.** No real Supabase project credentials are available. The migration SQL was validated via static analysis only (table presence, constraint patterns, secret absence). The original acceptance standard requires "空库可一次迁移成功" — this was not verified against a real database.
+**Executed successfully on 2026-06-26.** A temporary PostgreSQL 16 Alpine Docker container was used as an empty database. Because the Day23 migration targets Supabase and references `auth.users`, the test database first created the minimal Supabase-compatible baseline:
+
+```sql
+create schema if not exists auth;
+create table if not exists auth.users (id uuid primary key);
+```
+
+The migration file `supabase/migrations/20260625000100_create_core_tables.sql` was then executed with `psql -v ON_ERROR_STOP=1` and completed with exit code 0.
+
+Post-migration object check:
+
+```text
+tables=14
+triggers=11
+foreign_keys=25
+indexes=42
+```
+
+The temporary container was removed after verification.
 
 ## 17. Format Check
 
@@ -267,7 +285,7 @@ git diff —check
 
 ## 28. Day23 Acceptance Conclusion
 
-**Partial pass.** All code artifacts are complete:
+**Pass.** All code artifacts are complete and the migration has been executed successfully on an empty PostgreSQL database with a minimal Supabase Auth baseline:
 
 1. ✅ Migration SQL covers all 12 design-doc tables plus 2 PCR-006 supplement tables.
 2. ✅ All fields, types, constraints, and relationships match the design document.
@@ -277,4 +295,4 @@ git diff —check
 6. ✅ No secrets in migration files.
 7. ✅ Static verification script passes (37/37).
 8. ✅ All quality gates pass (format, lint, tests, e2e, build).
-9. ⚠️ **Real empty-database migration was NOT executed** — no Supabase credentials available. The acceptance standard "空库可一次迁移成功" cannot be fully confirmed without a real database test. The SQL structure is complete and syntactically sound based on static analysis.
+9. ✅ Real empty-database migration executed successfully in a temporary PostgreSQL 16 Docker container.
