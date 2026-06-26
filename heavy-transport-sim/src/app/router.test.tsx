@@ -1,112 +1,183 @@
-import { render, screen } from '@testing-library/react'
-import { createMemoryRouter, RouterProvider } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
-import AppLayout from '../layouts/AppLayout'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import { RouterProvider, createMemoryRouter } from 'react-router-dom'
+import { useAuthStore } from '../stores/auth/useAuthStore'
+import LoginPage from '../pages/login/LoginPage'
 import StudentPage from '../pages/student/StudentPage'
 import TeacherPage from '../pages/teacher/TeacherPage'
-import LoginPage from '../pages/login/LoginPage'
+import ForbiddenPage from '../pages/forbidden/ForbiddenPage'
 import NotFoundPage from '../pages/not-found/NotFoundPage'
-import { Navigate } from 'react-router-dom'
+import AuthGuard from './AuthGuard'
+import RoleGuard from './RoleGuard'
 
-const testRoutes = [
-  {
-    path: '/',
-    element: <AppLayout />,
-    children: [
+function createTestRouter(initialEntries: string[]) {
+  return createMemoryRouter(
+    [
       {
-        index: true,
-        element: <Navigate to="/student" replace />,
-      },
-      {
-        path: 'student',
-        element: <StudentPage />,
-      },
-      {
-        path: 'teacher',
-        element: <TeacherPage />,
-      },
-      {
-        path: 'login',
+        path: '/login',
         element: <LoginPage />,
+      },
+      {
+        path: '/403',
+        element: <ForbiddenPage />,
+      },
+      {
+        path: '/student',
+        element: (
+          <AuthGuard>
+            <RoleGuard>
+              <StudentPage />
+            </RoleGuard>
+          </AuthGuard>
+        ),
+      },
+      {
+        path: '/teacher',
+        element: (
+          <AuthGuard>
+            <RoleGuard>
+              <TeacherPage />
+            </RoleGuard>
+          </AuthGuard>
+        ),
       },
       {
         path: '*',
         element: <NotFoundPage />,
       },
     ],
-  },
-]
+    {
+      initialEntries,
+    },
+  )
+}
 
-describe('Routing', () => {
-  it('renders student page at /student', () => {
-    const router = createMemoryRouter(testRoutes, {
-      initialEntries: ['/student'],
+describe('Route Guards', () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
     })
-    render(<RouterProvider router={router} />)
-
-    expect(
-      screen.getByRole('heading', { level: 1, name: '学生端' }),
-    ).toBeInTheDocument()
+    sessionStorage.clear()
   })
 
-  it('renders teacher page at /teacher', () => {
-    const router = createMemoryRouter(testRoutes, {
-      initialEntries: ['/teacher'],
-    })
-    render(<RouterProvider router={router} />)
+  describe('Unauthenticated Access', () => {
+    it('should redirect to login when accessing student page without auth', async () => {
+      const router = createTestRouter(['/student'])
+      render(<RouterProvider router={router} />)
 
-    expect(
-      screen.getByRole('heading', { level: 1, name: '教师端' }),
-    ).toBeInTheDocument()
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe('/login')
+      })
+    })
+
+    it('should redirect to login when accessing teacher page without auth', async () => {
+      const router = createTestRouter(['/teacher'])
+      render(<RouterProvider router={router} />)
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe('/login')
+      })
+    })
+
+    it('should show login page', async () => {
+      const router = createTestRouter(['/login'])
+      render(<RouterProvider router={router} />)
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/大件运输虚拟仿真实验教学系统/),
+        ).toBeInTheDocument()
+      })
+    })
   })
 
-  it('renders login page at /login', () => {
-    const router = createMemoryRouter(testRoutes, {
-      initialEntries: ['/login'],
+  describe('Student Access', () => {
+    beforeEach(() => {
+      useAuthStore.setState({
+        user: {
+          id: 'student-1',
+          email: 'student@test.com',
+          role: 'student',
+          name: '测试学生',
+        },
+        isAuthenticated: true,
+        isLoading: false,
+      })
     })
-    render(<RouterProvider router={router} />)
 
-    expect(
-      screen.getByRole('heading', { level: 1, name: '登录' }),
-    ).toBeInTheDocument()
+    it('should allow student to access student page', async () => {
+      const router = createTestRouter(['/student'])
+      render(<RouterProvider router={router} />)
+
+      await waitFor(() => {
+        expect(screen.getByText('学生端')).toBeInTheDocument()
+      })
+    })
+
+    it('should redirect student to 403 when accessing teacher page', async () => {
+      const router = createTestRouter(['/teacher'])
+      render(<RouterProvider router={router} />)
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe('/403')
+      })
+    })
+
+    it('should show 403 page with correct message', async () => {
+      const router = createTestRouter(['/teacher'])
+      render(<RouterProvider router={router} />)
+
+      await waitFor(() => {
+        expect(screen.getByText('无权限访问')).toBeInTheDocument()
+        expect(screen.getByText('当前账号无权访问此页面')).toBeInTheDocument()
+      })
+    })
   })
 
-  it('renders 404 page for unknown paths', () => {
-    const router = createMemoryRouter(testRoutes, {
-      initialEntries: ['/unknown'],
+  describe('Teacher Access', () => {
+    beforeEach(() => {
+      useAuthStore.setState({
+        user: {
+          id: 'teacher-1',
+          email: 'teacher@test.com',
+          role: 'teacher',
+          name: '测试教师',
+        },
+        isAuthenticated: true,
+        isLoading: false,
+      })
     })
-    render(<RouterProvider router={router} />)
 
-    expect(
-      screen.getByRole('heading', { level: 1, name: '页面未找到' }),
-    ).toBeInTheDocument()
+    it('should allow teacher to access teacher page', async () => {
+      const router = createTestRouter(['/teacher'])
+      render(<RouterProvider router={router} />)
+
+      await waitFor(() => {
+        expect(screen.getByText('教师端')).toBeInTheDocument()
+      })
+    })
+
+    it('should redirect teacher to 403 when accessing student page', async () => {
+      const router = createTestRouter(['/student'])
+      render(<RouterProvider router={router} />)
+
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe('/403')
+      })
+    })
   })
 
-  it('renders global layout with navigation', () => {
-    const router = createMemoryRouter(testRoutes, {
-      initialEntries: ['/student'],
+  describe('404 Handling', () => {
+    it('should show 404 page for unknown routes', async () => {
+      const router = createTestRouter(['/unknown-route'])
+      render(<RouterProvider router={router} />)
+
+      await waitFor(() => {
+        expect(screen.getByText('页面未找到')).toBeInTheDocument()
+      })
     })
-    render(<RouterProvider router={router} />)
-
-    expect(
-      screen.getByRole('heading', {
-        level: 1,
-        name: '大件运输虚拟仿真实验教学系统',
-      }),
-    ).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '学生端' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '教师端' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '登录' })).toBeInTheDocument()
-  })
-
-  it('navigates to /student from root', () => {
-    const router = createMemoryRouter(testRoutes, {
-      initialEntries: ['/'],
-    })
-    render(<RouterProvider router={router} />)
-
-    expect(
-      screen.getByRole('heading', { level: 1, name: '学生端' }),
-    ).toBeInTheDocument()
   })
 })

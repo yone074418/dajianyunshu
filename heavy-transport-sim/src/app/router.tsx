@@ -4,6 +4,10 @@ import StudentPage from '../pages/student/StudentPage'
 import TeacherPage from '../pages/teacher/TeacherPage'
 import LoginPage from '../pages/login/LoginPage'
 import NotFoundPage from '../pages/not-found/NotFoundPage'
+import ForbiddenPage from '../pages/forbidden/ForbiddenPage'
+import SessionExpiredPage from '../pages/session-expired/SessionExpiredPage'
+import AuthGuard from './AuthGuard'
+import RoleGuard from './RoleGuard'
 
 export const router = createBrowserRouter([
   {
@@ -15,16 +19,36 @@ export const router = createBrowserRouter([
         element: <Navigate to="/student" replace />,
       },
       {
+        path: 'login',
+        element: <LoginPage />,
+      },
+      {
+        path: 'session-expired',
+        element: <SessionExpiredPage />,
+      },
+      {
+        path: '403',
+        element: <ForbiddenPage />,
+      },
+      {
         path: 'student',
-        element: <StudentPage />,
+        element: (
+          <AuthGuard>
+            <RoleGuard>
+              <StudentPage />
+            </RoleGuard>
+          </AuthGuard>
+        ),
       },
       {
         path: 'teacher',
-        element: <TeacherPage />,
-      },
-      {
-        path: 'login',
-        element: <LoginPage />,
+        element: (
+          <AuthGuard>
+            <RoleGuard>
+              <TeacherPage />
+            </RoleGuard>
+          </AuthGuard>
+        ),
       },
       {
         path: '*',
