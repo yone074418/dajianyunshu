@@ -1,19 +1,21 @@
 import { expect, test } from '@playwright/test'
 
-test('loads the student page at /student', async ({ page }) => {
+test('redirects /student to login without a session', async ({ page }) => {
   await page.goto('/student')
+  await expect(page).toHaveURL('/login')
   await expect(
-    page.getByRole('heading', { level: 1, name: '学生端' }),
+    page.getByRole('heading', { level: 1, name: '登录' }),
   ).toBeVisible()
-  await expect(page.getByText('功能将在后续任务实现')).toBeVisible()
+  await expect(page.getByLabel('邮箱')).toBeVisible()
 })
 
-test('loads the teacher page at /teacher', async ({ page }) => {
+test('redirects /teacher to login without a session', async ({ page }) => {
   await page.goto('/teacher')
+  await expect(page).toHaveURL('/login')
   await expect(
-    page.getByRole('heading', { level: 1, name: '教师端' }),
+    page.getByRole('heading', { level: 1, name: '登录' }),
   ).toBeVisible()
-  await expect(page.getByText('功能将在后续任务实现')).toBeVisible()
+  await expect(page.getByLabel('密码')).toBeVisible()
 })
 
 test('loads the login page at /login', async ({ page }) => {
@@ -21,7 +23,7 @@ test('loads the login page at /login', async ({ page }) => {
   await expect(
     page.getByRole('heading', { level: 1, name: '登录' }),
   ).toBeVisible()
-  await expect(page.getByText('功能将在后续任务实现')).toBeVisible()
+  await expect(page.getByRole('button', { name: '登录' })).toBeVisible()
 })
 
 test('shows 404 page for unknown routes', async ({ page }) => {
@@ -32,35 +34,34 @@ test('shows 404 page for unknown routes', async ({ page }) => {
   await expect(page.getByText('您访问的页面不存在')).toBeVisible()
 })
 
-test('navigates between pages using nav links', async ({ page }) => {
-  await page.goto('/student')
+test('protected nav links return to login without a session', async ({
+  page,
+}) => {
+  await page.goto('/login')
 
   await page.getByRole('link', { name: '教师端' }).click()
-  await expect(
-    page.getByRole('heading', { level: 1, name: '教师端' }),
-  ).toBeVisible()
-
-  await page.getByRole('link', { name: '登录' }).click()
+  await expect(page).toHaveURL('/login')
   await expect(
     page.getByRole('heading', { level: 1, name: '登录' }),
   ).toBeVisible()
 
   await page.getByRole('link', { name: '学生端' }).click()
+  await expect(page).toHaveURL('/login')
   await expect(
-    page.getByRole('heading', { level: 1, name: '学生端' }),
+    page.getByRole('heading', { level: 1, name: '登录' }),
   ).toBeVisible()
 })
 
-test('root path redirects to /student', async ({ page }) => {
+test('root path redirects to login without a session', async ({ page }) => {
   await page.goto('/')
-  await expect(page).toHaveURL('/student')
+  await expect(page).toHaveURL('/login')
   await expect(
-    page.getByRole('heading', { level: 1, name: '学生端' }),
+    page.getByRole('heading', { level: 1, name: '登录' }),
   ).toBeVisible()
 })
 
 test('displays global layout with navigation', async ({ page }) => {
-  await page.goto('/student')
+  await page.goto('/login')
 
   await expect(
     page.getByRole('heading', {
