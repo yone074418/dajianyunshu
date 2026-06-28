@@ -3,7 +3,18 @@ import {
   validateTransportCase,
   type TransportCase,
 } from '../../domain/transportCase'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  getCurrentProfile,
+  type AuthProfile,
+} from '../../features/auth/authSession'
+import {
+  createAttemptForStudent,
+  getActiveAttemptForStudent,
+  saveAttemptStep,
+  type AttemptWithSteps,
+} from '../../services/attempts/attemptService'
 
 const STAGE_NAMES = [
   '运输任务及货物介绍',
@@ -43,7 +54,90 @@ function loadCase(): PageState {
 }
 
 export default function TaskIntroductionPage() {
+  const navigate = useNavigate()
   const state = useMemo(() => loadCase(), [])
+  const [profile, setProfile] = useState<AuthProfile | null>(null)
+  const [activeAttempt, setActiveAttempt] = useState<AttemptWithSteps | null>(
+    null,
+  )
+  const [flowStatus, setFlowStatus] = useState<
+    'loading' | 'ready' | 'saving' | 'completed' | 'error'
+  >('loading')
+  const [flowError, setFlowError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function restoreFlow() {
+      const currentProfile = await getCurrentProfile()
+      if (cancelled) return
+
+      if (!currentProfile || currentProfile.role !== 'student') {
+        setFlowStatus('ready')
+        return
+      }
+
+      setProfile(currentProfile)
+      const existing = await getActiveAttemptForStudent(currentProfile.id)
+      if (cancelled) return
+
+      setActiveAttempt(existing)
+      setFlowStatus(
+        existing?.steps[0]?.status === 'completed' ? 'completed' : 'ready',
+      )
+    }
+
+    restoreFlow()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleContinueToVehicleSelection = async () => {
+    if (state.status !== 'ready') return
+
+    setFlowError(null)
+    setFlowStatus('saving')
+
+    try {
+      const currentProfile = profile ?? (await getCurrentProfile())
+      if (!currentProfile || currentProfile.role !== 'student') {
+        navigate('/login')
+        return
+      }
+
+      const attempt =
+        activeAttempt ??
+        (await getActiveAttemptForStudent(currentProfile.id)) ??
+        (await createAttemptForStudent({
+          studentId: currentProfile.id,
+          caseId: state.data.id,
+        }))
+
+      const firstStep = attempt.steps[0]
+      if (firstStep.status !== 'completed') {
+        await saveAttemptStep({
+          studentId: currentProfile.id,
+          attemptId: attempt.attempt.id,
+          stepId: firstStep.id,
+          status: 'completed',
+          dataSnapshot: {
+            stageId: 'stage_1_task_intro',
+            caseId: state.data.id,
+            completedAt: new Date().toISOString(),
+            source: 'task-introduction-page',
+          },
+        })
+      }
+
+      setFlowStatus('completed')
+      navigate('/student/experiment')
+    } catch (err) {
+      setFlowStatus('error')
+      setFlowError(err instanceof Error ? err.message : '保存第一阶段失败')
+    }
+  }
 
   if (state.status === 'empty') {
     return (
@@ -223,8 +317,26 @@ export default function TaskIntroductionPage() {
       </section>
 
       <div style={{ textAlign: 'center', marginTop: '24px' }}>
+        {flowStatus === 'completed' && (
+          <p
+            data-testid="stage-one-completed"
+            style={{ color: '#2e7d32', fontSize: '13px' }}
+          >
+            第一阶段已完成，可继续进入简单配车。
+          </p>
+        )}
+        {flowError && (
+          <p
+            data-testid="stage-one-error"
+            style={{ color: '#c00', fontSize: '13px' }}
+          >
+            {flowError}
+          </p>
+        )}
         <button
           data-testid="continue-btn"
+          onClick={handleContinueToVehicleSelection}
+          disabled={flowStatus === 'saving'}
           style={{
             padding: '12px 32px',
             background: '#3d85c6',
@@ -232,10 +344,11 @@ export default function TaskIntroductionPage() {
             border: 'none',
             borderRadius: '6px',
             fontSize: '16px',
-            cursor: 'pointer',
+            cursor: flowStatus === 'saving' ? 'not-allowed' : 'pointer',
+            opacity: flowStatus === 'saving' ? 0.7 : 1,
           }}
         >
-          我已了解任务，继续
+          {flowStatus === 'saving' ? '保存中...' : '我已了解任务，继续'}
         </button>
       </div>
     </div>

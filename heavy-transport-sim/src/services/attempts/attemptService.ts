@@ -23,6 +23,58 @@ function now(): string {
 const attempts: Map<string, Attempt> = new Map()
 const steps: Map<string, AttemptStep[]> = new Map()
 const logs: OperationLog[] = []
+const STORAGE_KEY = 'heavy-transport-sim:attempt-service:v1'
+let hydrated = false
+
+function canUseLocalStorage(): boolean {
+  return typeof localStorage !== 'undefined'
+}
+
+function hydrate(): void {
+  if (hydrated || !canUseLocalStorage()) return
+  hydrated = true
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return
+    const parsed = JSON.parse(raw) as {
+      attempts?: Attempt[]
+      steps?: [string, AttemptStep[]][]
+      logs?: OperationLog[]
+    }
+
+    attempts.clear()
+    steps.clear()
+    logs.length = 0
+
+    for (const attempt of parsed.attempts ?? []) {
+      attempts.set(attempt.id, attempt)
+    }
+
+    for (const [attemptId, attemptSteps] of parsed.steps ?? []) {
+      steps.set(attemptId, attemptSteps)
+    }
+
+    logs.push(...(parsed.logs ?? []))
+  } catch {
+    attempts.clear()
+    steps.clear()
+    logs.length = 0
+  }
+}
+
+function persist(): void {
+  if (!canUseLocalStorage()) return
+
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      attempts: Array.from(attempts.values()),
+      steps: Array.from(steps.entries()),
+      logs,
+    }),
+  )
+}
 
 function addLog(
   attemptId: string,
@@ -40,16 +92,22 @@ function addLog(
     result,
     timestamp: now(),
   })
+  persist()
 }
 
 export function getLogs(): OperationLog[] {
+  hydrate()
   return [...logs]
 }
 
 export function clearAll(): void {
+  hydrated = true
   attempts.clear()
   steps.clear()
   logs.length = 0
+  if (canUseLocalStorage()) {
+    localStorage.removeItem(STORAGE_KEY)
+  }
 }
 
 export async function requireStudentId(): Promise<string> {
@@ -64,6 +122,7 @@ export async function createAttemptForStudent(input: {
   studentId: string
   caseId: string
 }): Promise<AttemptWithSteps> {
+  hydrate()
   const existing = Array.from(attempts.values()).find(
     (a) => a.studentId === input.studentId && a.status === 'in_progress',
   )
@@ -97,6 +156,7 @@ export async function createAttemptForStudent(input: {
   attempts.set(attemptId, attempt)
   steps.set(attemptId, attemptSteps)
   addLog(attemptId, input.studentId, 'attempt_created', STAGE_IDS[0], 'success')
+  persist()
 
   return { attempt, steps: attemptSteps }
 }
@@ -104,6 +164,7 @@ export async function createAttemptForStudent(input: {
 export async function getActiveAttemptForStudent(
   studentId: string,
 ): Promise<AttemptWithSteps | null> {
+  hydrate()
   const attempt = Array.from(attempts.values()).find(
     (a) => a.studentId === studentId && a.status === 'in_progress',
   )
@@ -120,6 +181,7 @@ export async function continueAttempt(input: {
   studentId: string
   attemptId: string
 }): Promise<AttemptResumeState> {
+  hydrate()
   const attempt = attempts.get(input.attemptId)
 
   if (!attempt) {
@@ -168,6 +230,7 @@ export async function saveAttemptStep(input: {
   status: StepStatus
   dataSnapshot?: unknown
 }): Promise<{ success: boolean; step: AttemptStep }> {
+  hydrate()
   const attempt = attempts.get(input.attemptId)
 
   if (!attempt) {
@@ -232,6 +295,7 @@ export async function saveAttemptStep(input: {
     step.stageId,
     'success',
   )
+  persist()
 
   return { success: true, step: updatedStep }
 }

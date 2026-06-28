@@ -304,6 +304,10 @@ export function getLearningCategories(): LearningCategory[] {
   return LEARNING_CATEGORIES
 }
 
+export function getAllChapterIds(): string[] {
+  return LEARNING_CATEGORIES.flatMap((c) => c.chapters.map((ch) => ch.id))
+}
+
 export function getLearningCategoryById(
   id: LearningCategoryId,
 ): LearningCategory | undefined {
