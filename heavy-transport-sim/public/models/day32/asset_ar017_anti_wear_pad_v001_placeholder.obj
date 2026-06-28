@@ -1,0 +1,24 @@
+# asset_ar017_anti_wear_pad_v001_placeholder
+# Project-made simple geometry placeholder for Day32. Not a final art asset.
+o asset_ar017_anti_wear_pad_v001_placeholder
+g anti_wear_pad_curved_plate
+v -0.55 -0.30 0.00
+v 0.55 -0.30 0.00
+v 0.55 0.30 0.00
+v -0.55 0.30 0.00
+v -0.48 -0.24 0.10
+v 0.48 -0.24 0.10
+v 0.48 0.24 0.10
+v -0.48 0.24 0.10
+g contact_marker
+v -0.08 -0.34 0.12
+v 0.08 -0.34 0.12
+v 0.08 0.34 0.12
+v -0.08 0.34 0.12
+f 1 2 3 4
+f 5 8 7 6
+f 1 5 6 2
+f 2 6 7 3
+f 3 7 8 4
+f 4 8 5 1
+f 9 10 11 12

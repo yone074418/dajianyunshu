@@ -1,0 +1,23 @@
+# Day31 self-made placeholder OBJ for AR-009 slope.
+# This simple geometry is not a formal art asset and uses no third-party model.
+o ar009_slope_placeholder
+v -3.0 -4.0 0.0
+v 3.0 -4.0 0.0
+v 3.0 0.0 0.8
+v -3.0 0.0 0.8
+v -3.0 0.0 0.8
+v 3.0 0.0 0.8
+v 3.0 2.0 0.8
+v -3.0 2.0 0.8
+v -0.3 -3.2 0.08
+v 0.3 -3.2 0.08
+v 0.3 -1.1 0.50
+v -0.3 -1.1 0.50
+v -0.8 -1.1 0.50
+v 0.0 -0.4 0.64
+v 0.8 -1.1 0.50
+f 1 2 3 4
+f 5 6 7 8
+f 9 10 11 12
+f 13 14 15
+

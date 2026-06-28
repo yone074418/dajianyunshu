@@ -1,0 +1,36 @@
+# Day30 self-made placeholder asset
+# AR-004 modular trailer unit
+# License status: project self-made placeholder, not formal art asset
+o asset_ar004_modtrailer_unit_v001_placeholder
+g modular_unit_deck
+v -1.200 -0.800 0.000
+v 1.200 -0.800 0.000
+v 1.200 0.800 0.000
+v -1.200 0.800 0.000
+v -1.200 -0.800 0.220
+v 1.200 -0.800 0.220
+v 1.200 0.800 0.220
+v -1.200 0.800 0.220
+f 1 2 3 4
+f 5 8 7 6
+f 1 5 6 2
+f 2 6 7 3
+f 3 7 8 4
+f 4 8 5 1
+g selectable_axle_line_marker
+v -0.200 -0.950 -0.050
+v 0.200 -0.950 -0.050
+v 0.200 0.950 -0.050
+v -0.200 0.950 -0.050
+f 9 10 11 12
+g connector_sockets
+v -1.350 -0.200 0.050
+v -1.200 -0.200 0.050
+v -1.200 0.200 0.050
+v -1.350 0.200 0.050
+v 1.200 -0.200 0.050
+v 1.350 -0.200 0.050
+v 1.350 0.200 0.050
+v 1.200 0.200 0.050
+f 13 14 15 16
+f 17 18 19 20

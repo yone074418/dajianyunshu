@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <path d="M8 40 L20 20 L28 28 L40 8" fill="none" stroke="#d9534f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="8" cy="40" r="4" fill="#5cb85c"/>
+  <circle cx="40" cy="8" r="4" fill="#d9534f"/>
+  <text x="6" y="46" font-family="sans-serif" font-size="6" fill="#333">起点</text>
+  <text x="32" y="18" font-family="sans-serif" font-size="6" fill="#333">终点</text>
+</svg>
