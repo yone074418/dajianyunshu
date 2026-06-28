@@ -10,6 +10,13 @@ vi.mock('@react-three/fiber', () => ({
       {children}
     </div>
   ),
+  useThree: () => ({
+    camera: {
+      position: { set: vi.fn(), x: 0, y: 1.7, z: 8 },
+      lookAt: vi.fn(),
+    },
+  }),
+  useFrame: vi.fn(),
 }))
 
 vi.mock('@react-three/drei', () => ({
@@ -45,6 +52,10 @@ vi.mock('../../scene/TriggerEventPanel', () => ({
   default: () => <div data-testid="trigger-event-panel" />,
 }))
 
+vi.mock('../../scene/SceneWalkthroughHelp', () => ({
+  default: () => <div data-testid="walkthrough-help" />,
+}))
+
 import ScenePreviewPage from './ScenePreviewPage'
 
 describe('ScenePreviewPage', () => {
@@ -55,7 +66,7 @@ describe('ScenePreviewPage', () => {
 
   it('should render description', () => {
     render(<ScenePreviewPage />)
-    expect(screen.getByText(/Day39 物理交互底座/)).toBeInTheDocument()
+    expect(screen.getByText(/Day40 第一人称漫游模式/)).toBeInTheDocument()
   })
 
   it('should render scene canvas', () => {
