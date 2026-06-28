@@ -14,6 +14,7 @@ vi.mock('@react-three/drei', () => ({
     <div data-testid="scene-loading-html">{children}</div>
   ),
   Grid: () => <div data-testid="grid" />,
+  OrbitControls: () => <div data-testid="orbit-controls" />,
 }))
 
 import SceneCanvas from './SceneCanvas'
