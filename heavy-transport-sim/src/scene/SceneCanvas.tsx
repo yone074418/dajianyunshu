@@ -22,12 +22,14 @@ import { SCENE_OBJECTS } from './sceneObjectMeta'
 import { useSceneInteraction } from './useSceneInteraction'
 import { useTriggerEvents } from './useTriggerEvents'
 import { useSceneViewMode } from './useSceneViewMode'
+import { useSceneCleanup } from './useSceneCleanup'
 
 interface SceneCanvasProps {
   style?: React.CSSProperties
+  sceneKey?: string | number
 }
 
-export default function SceneCanvas({ style }: SceneCanvasProps) {
+export default function SceneCanvas({ style, sceneKey }: SceneCanvasProps) {
   const [retryKey, setRetryKey] = useState(0)
   const mode = useSceneViewMode((s) => s.mode)
   const {
@@ -36,8 +38,16 @@ export default function SceneCanvas({ style }: SceneCanvasProps) {
     handlePointerOver,
     handlePointerOut,
     handleClick,
+    resetAll,
   } = useSceneInteraction()
-  const { events, recordEvent } = useTriggerEvents()
+  const { events, recordEvent, clearEvents } = useTriggerEvents()
+
+  const cleanup = useCallback(() => {
+    resetAll()
+    clearEvents()
+  }, [resetAll, clearEvents])
+
+  useSceneCleanup(sceneKey ?? 'default', cleanup)
 
   const handleRetry = useCallback(() => {
     setRetryKey((k) => k + 1)
@@ -53,7 +63,7 @@ export default function SceneCanvas({ style }: SceneCanvasProps) {
     <div style={{ position: 'relative' }}>
       <SceneErrorBoundary onRetry={handleRetry}>
         <Canvas
-          key={retryKey}
+          key={`${sceneKey ?? 'default'}-${retryKey}`}
           data-testid="scene-canvas"
           style={{ width: '100%', height: '400px', ...style }}
           camera={{

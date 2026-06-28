@@ -114,4 +114,31 @@ describe('SceneCanvas', () => {
     fireEvent.click(screen.getByTestId('mode-toggle-btn'))
     expect(screen.queryByTestId('orbit-controls')).not.toBeInTheDocument()
   })
+
+  it('should render only one canvas element', () => {
+    const { container } = render(<SceneCanvas />)
+    const canvases = container.querySelectorAll('[data-testid="scene-canvas"]')
+    expect(canvases.length).toBe(1)
+  })
+
+  it('should accept sceneKey prop', () => {
+    render(<SceneCanvas sceneKey="step-1" />)
+    expect(screen.getByTestId('scene-canvas')).toBeInTheDocument()
+  })
+
+  it('should remount when sceneKey changes', () => {
+    const { unmount } = render(<SceneCanvas sceneKey="step-1" />)
+    expect(screen.getByTestId('scene-canvas')).toBeInTheDocument()
+    unmount()
+    render(<SceneCanvas sceneKey="step-2" />)
+    expect(screen.getByTestId('scene-canvas')).toBeInTheDocument()
+  })
+
+  it('should have only one canvas after sceneKey change', () => {
+    const { unmount } = render(<SceneCanvas sceneKey="step-1" />)
+    unmount()
+    const { container: container2 } = render(<SceneCanvas sceneKey="step-2" />)
+    const canvases = container2.querySelectorAll('[data-testid="scene-canvas"]')
+    expect(canvases.length).toBe(1)
+  })
 })

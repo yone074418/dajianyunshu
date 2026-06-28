@@ -27,6 +27,11 @@ export function useSceneInteraction() {
     setSelectedObjectId(null)
   }, [])
 
+  const resetAll = useCallback(() => {
+    setHoveredObjectId(null)
+    setSelectedObjectId(null)
+  }, [])
+
   return {
     hoveredObjectId,
     selectedObjectId,
@@ -34,5 +39,6 @@ export function useSceneInteraction() {
     handlePointerOut,
     handleClick,
     clearSelection,
+    resetAll,
   }
 }
