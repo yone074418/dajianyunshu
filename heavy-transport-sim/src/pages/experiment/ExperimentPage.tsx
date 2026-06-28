@@ -13,6 +13,7 @@ import {
   type AttemptResumeState,
 } from '../../services/attempts/attemptService'
 import { STAGE_NAMES, type StageId } from '../../types/attempt'
+import CurrentStepHintPanel from '../hints/CurrentStepHintPanel'
 
 const DEFAULT_CASE_ID = 'case-1'
 
@@ -147,6 +148,10 @@ export default function ExperimentPage() {
           <h2>当前阶段: {STAGE_NAMES[resumeState.currentStep.stageId]}</h2>
           <p>步骤ID: {resumeState.currentStep.id}</p>
           <p>状态: {resumeState.currentStep.status}</p>
+          <CurrentStepHintPanel
+            stepId={resumeState.currentStep.stageId}
+            stepName={STAGE_NAMES[resumeState.currentStep.stageId]}
+          />
           <button
             onClick={() =>
               handleSave(

@@ -1,6 +1,10 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import LearningCenterPage from './LearningCenterPage'
+
+beforeEach(() => {
+  localStorage.clear()
+})
 
 describe('LearningCenterPage', () => {
   it('should render the page', () => {
@@ -83,17 +87,20 @@ describe('LearningCenterPage', () => {
     expect(screen.getByText(/关联实验阶段：/)).toBeInTheDocument()
   })
 
-  it('should show progress save note', () => {
+  it('should show persisted learning progress summary', () => {
     render(<LearningCenterPage />)
-    expect(
-      screen.getByText(/学习进度保存功能将在后续版本中实现/),
-    ).toBeInTheDocument()
+    expect(screen.getByTestId('learning-progress-summary')).toBeInTheDocument()
+    expect(screen.getByText(/学习进度：0 \/ \d+ 章节已读/)).toBeInTheDocument()
   })
 
-  it('should not display progress bar or completion percentage', () => {
+  it('should mark expanded chapter as read', async () => {
     render(<LearningCenterPage />)
-    expect(screen.queryByText(/已完成/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/完成度/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/已读/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('牵引车基础'))
+    fireEvent.click(screen.getByTestId('mark-read-vehicle-tractor-basics'))
+
+    await waitFor(() => {
+      expect(screen.getByText('已读')).toBeInTheDocument()
+    })
+    expect(screen.getByText(/学习进度：1 \/ \d+ 章节已读/)).toBeInTheDocument()
   })
 })

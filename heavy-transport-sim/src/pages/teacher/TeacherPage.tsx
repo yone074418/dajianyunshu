@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/auth/useAuthStore'
+import LearningCompletionOverview from './LearningCompletionOverview'
 
 export default function TeacherPage() {
   const navigate = useNavigate()
@@ -43,6 +44,10 @@ export default function TeacherPage() {
                   ? '教师'
                   : '未知'}
             </p>
+          </div>
+
+          <div className="mt-6">
+            <LearningCompletionOverview />
           </div>
         </div>
       </main>

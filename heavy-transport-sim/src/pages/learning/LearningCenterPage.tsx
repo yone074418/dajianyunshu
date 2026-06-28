@@ -4,6 +4,7 @@ import {
   validateLearningContent,
   type LearningCategory,
 } from '../../domain/learningContent'
+import { useLearningProgress } from '../../domain/useLearningProgress'
 
 type PageState =
   | { status: 'ready'; data: LearningCategory[] }
@@ -28,6 +29,7 @@ function loadContent(): PageState {
 export default function LearningCenterPage() {
   const state = useMemo(() => loadContent(), [])
   const [expandedChapter, setExpandedChapter] = useState<string | null>(null)
+  const progress = useLearningProgress()
 
   if (state.status === 'empty') {
     return (
@@ -62,9 +64,21 @@ export default function LearningCenterPage() {
       <p style={{ color: '#666', fontSize: '14px' }}>
         请先学习以下五类大件运输知识，为后续实验操作做好准备。
       </p>
-      <p style={{ color: '#999', fontSize: '12px' }}>
-        注：学习进度保存功能将在后续版本中实现。
-      </p>
+      <div
+        data-testid="learning-progress-summary"
+        style={{
+          marginTop: '12px',
+          padding: '12px',
+          background: '#eef6ff',
+          border: '1px solid #c9e0ff',
+          borderRadius: '6px',
+          color: '#24527a',
+          fontSize: '14px',
+        }}
+      >
+        学习进度：{progress.summary.readChapters} /{' '}
+        {progress.summary.totalChapters} 章节已读
+      </div>
 
       {data.map((category) => (
         <section
@@ -179,6 +193,31 @@ export default function LearningCenterPage() {
                     >
                       {chapter.content}
                     </div>
+                    <button
+                      data-testid={`mark-read-${chapter.id}`}
+                      onClick={() => progress.markChapterRead(chapter.id)}
+                      disabled={progress.status === 'saving'}
+                      style={{
+                        marginTop: '12px',
+                        padding: '6px 12px',
+                        border: '1px solid #3d85c6',
+                        borderRadius: '4px',
+                        background: progress.isChapterRead(chapter.id)
+                          ? '#e6f4ea'
+                          : '#fff',
+                        color: progress.isChapterRead(chapter.id)
+                          ? '#2e7d32'
+                          : '#3d85c6',
+                        cursor:
+                          progress.status === 'saving'
+                            ? 'not-allowed'
+                            : 'pointer',
+                      }}
+                    >
+                      {progress.isChapterRead(chapter.id)
+                        ? '已读'
+                        : '标记为已读'}
+                    </button>
                     <div
                       style={{
                         marginTop: '8px',
