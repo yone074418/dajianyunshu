@@ -5,7 +5,7 @@ export default function ScenePreviewPage() {
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
       <h1>场景预览</h1>
       <p style={{ color: '#666', fontSize: '14px' }}>
-        Day38 模型交互底座 — 支持悬停、点选、高亮和教学提示。
+        Day39 物理交互底座 — 支持刚体、碰撞器和触发区事件记录。
       </p>
       <div style={{ marginBottom: '12px' }}>
         <button

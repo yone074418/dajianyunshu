@@ -1,5 +1,6 @@
 import { Suspense, useState, useCallback } from 'react'
 import { Canvas } from '@react-three/fiber'
+import { Physics } from '@react-three/rapier'
 import SceneLighting from './SceneLighting'
 import Ground from './Ground'
 import LoadingUI from './LoadingUI'
@@ -7,9 +8,16 @@ import SceneErrorBoundary from './SceneErrorBoundary'
 import SceneCameraControls from './SceneCameraControls'
 import PlaceholderModels from './PlaceholderModels'
 import SceneInfoPanel from './SceneInfoPanel'
+import GroundCollider from './GroundCollider'
+import VehicleRigidBody from './VehicleRigidBody'
+import ObstacleCollider from './ObstacleCollider'
+import TriggerZone from './TriggerZone'
+import TriggerEventPanel from './TriggerEventPanel'
 import { SCENE_CAMERA_DEFAULTS } from './cameraDefaults'
+import { SCENE_PHYSICS_CONFIG } from './physicsConfig'
 import { SCENE_OBJECTS } from './sceneObjectMeta'
 import { useSceneInteraction } from './useSceneInteraction'
+import { useTriggerEvents } from './useTriggerEvents'
 
 interface SceneCanvasProps {
   style?: React.CSSProperties
@@ -24,6 +32,7 @@ export default function SceneCanvas({ style }: SceneCanvasProps) {
     handlePointerOut,
     handleClick,
   } = useSceneInteraction()
+  const { events, recordEvent } = useTriggerEvents()
 
   const handleRetry = useCallback(() => {
     setRetryKey((k) => k + 1)
@@ -54,23 +63,61 @@ export default function SceneCanvas({ style }: SceneCanvasProps) {
           }}
         >
           <Suspense fallback={<LoadingUI />}>
-            <SceneLighting />
-            <Ground />
-            <SceneCameraControls />
-            <PlaceholderModels
-              objects={SCENE_OBJECTS}
-              hoveredObjectId={hoveredObjectId}
-              selectedObjectId={selectedObjectId}
-              onPointerOver={handlePointerOver}
-              onPointerOut={handlePointerOut}
-              onClick={handleClick}
-            />
+            <Physics
+              gravity={SCENE_PHYSICS_CONFIG.gravity}
+              timeStep={SCENE_PHYSICS_CONFIG.timeStep}
+            >
+              <SceneLighting />
+              <Ground />
+              <GroundCollider />
+              <SceneCameraControls />
+              <VehicleRigidBody id="tractor-6x6" position={[-3, 0.6, 0]}>
+                <PlaceholderModels
+                  objects={SCENE_OBJECTS.filter((o) => o.category === 'vehicle')}
+                  hoveredObjectId={hoveredObjectId}
+                  selectedObjectId={selectedObjectId}
+                  onPointerOver={handlePointerOver}
+                  onPointerOut={handlePointerOut}
+                  onClick={handleClick}
+                />
+              </VehicleRigidBody>
+              <VehicleRigidBody id="cargo-main" position={[0, 0.6, 0]}>
+                <PlaceholderModels
+                  objects={SCENE_OBJECTS.filter((o) => o.category === 'cargo')}
+                  hoveredObjectId={hoveredObjectId}
+                  selectedObjectId={selectedObjectId}
+                  onPointerOver={handlePointerOver}
+                  onPointerOut={handlePointerOut}
+                  onClick={handleClick}
+                />
+              </VehicleRigidBody>
+              <ObstacleCollider id="height-limit" position={[4, 1.5, 0]}>
+                <PlaceholderModels
+                  objects={SCENE_OBJECTS.filter(
+                    (o) => o.category === 'obstacle',
+                  )}
+                  hoveredObjectId={hoveredObjectId}
+                  selectedObjectId={selectedObjectId}
+                  onPointerOver={handlePointerOver}
+                  onPointerOut={handlePointerOut}
+                  onClick={handleClick}
+                />
+              </ObstacleCollider>
+              <TriggerZone
+                id="trigger-height-zone"
+                name="限高检测区"
+                position={[4, 1, 0]}
+                halfExtents={[1.5, 1.5, 1.5]}
+                onTriggerEvent={recordEvent}
+              />
+            </Physics>
           </Suspense>
         </Canvas>
         <SceneInfoPanel
           meta={panelMeta}
           isHovered={!!hoveredMeta && !selectedMeta}
         />
+        <TriggerEventPanel events={events} />
       </SceneErrorBoundary>
     </div>
   )
