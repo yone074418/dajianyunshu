@@ -8,6 +8,7 @@ import ForbiddenPage from '../pages/forbidden/ForbiddenPage'
 import SessionExpiredPage from '../pages/session-expired/SessionExpiredPage'
 import ExperimentPage from '../pages/experiment/ExperimentPage'
 import ScenePreviewPage from '../pages/scene-preview/ScenePreviewPage'
+import Cargo360Viewer from '../pages/cargo-viewer/Cargo360Viewer'
 import AuthGuard from './AuthGuard'
 import RoleGuard from './RoleGuard'
 
@@ -38,6 +39,16 @@ export const router = createBrowserRouter([
           <AuthGuard>
             <RoleGuard>
               <StudentPage />
+            </RoleGuard>
+          </AuthGuard>
+        ),
+      },
+      {
+        path: 'student/cargo',
+        element: (
+          <AuthGuard>
+            <RoleGuard>
+              <Cargo360Viewer />
             </RoleGuard>
           </AuthGuard>
         ),
