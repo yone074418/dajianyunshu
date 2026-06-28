@@ -66,9 +66,7 @@ export default function SceneInfoPanel({
         {meta.teachingTip}
       </div>
       {isHovered && (
-        <div
-          style={{ marginTop: '8px', fontSize: '11px', color: '#999' }}
-        >
+        <div style={{ marginTop: '8px', fontSize: '11px', color: '#999' }}>
           点击选中此对象
         </div>
       )}

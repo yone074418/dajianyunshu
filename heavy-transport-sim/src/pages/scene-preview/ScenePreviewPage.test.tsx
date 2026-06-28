@@ -2,7 +2,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
 vi.mock('@react-three/fiber', () => ({
-  Canvas: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
+  Canvas: ({
+    children,
+    ...props
+  }: React.PropsWithChildren<Record<string, unknown>>) => (
     <div data-testid="scene-canvas" {...props}>
       {children}
     </div>
@@ -21,7 +24,10 @@ vi.mock('@react-three/rapier', () => ({
   Physics: ({ children }: React.PropsWithChildren) => (
     <div data-testid="physics-world">{children}</div>
   ),
-  RigidBody: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
+  RigidBody: ({
+    children,
+    ...props
+  }: React.PropsWithChildren<Record<string, unknown>>) => (
     <div data-testid={props['data-testid'] ?? 'rigidbody'}>{children}</div>
   ),
   CuboidCollider: () => <div data-testid="cuboid-collider" />,
@@ -49,9 +55,7 @@ describe('ScenePreviewPage', () => {
 
   it('should render description', () => {
     render(<ScenePreviewPage />)
-    expect(
-      screen.getByText(/Day39 物理交互底座/),
-    ).toBeInTheDocument()
+    expect(screen.getByText(/Day39 物理交互底座/)).toBeInTheDocument()
   })
 
   it('should render scene canvas', () => {

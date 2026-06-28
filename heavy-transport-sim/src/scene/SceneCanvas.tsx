@@ -73,7 +73,9 @@ export default function SceneCanvas({ style }: SceneCanvasProps) {
               <SceneCameraControls />
               <VehicleRigidBody id="tractor-6x6" position={[-3, 0.6, 0]}>
                 <PlaceholderModels
-                  objects={SCENE_OBJECTS.filter((o) => o.category === 'vehicle')}
+                  objects={SCENE_OBJECTS.filter(
+                    (o) => o.category === 'vehicle',
+                  )}
                   hoveredObjectId={hoveredObjectId}
                   selectedObjectId={selectedObjectId}
                   onPointerOver={handlePointerOver}

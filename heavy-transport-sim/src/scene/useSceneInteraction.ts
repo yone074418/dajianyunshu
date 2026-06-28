@@ -19,12 +19,9 @@ export function useSceneInteraction() {
     setHoveredObjectId(null)
   }, [])
 
-  const handleClick = useCallback(
-    (id: string) => {
-      setSelectedObjectId((prev) => (prev === id ? null : id))
-    },
-    [],
-  )
+  const handleClick = useCallback((id: string) => {
+    setSelectedObjectId((prev) => (prev === id ? null : id))
+  }, [])
 
   const clearSelection = useCallback(() => {
     setSelectedObjectId(null)

@@ -1,6 +1,4 @@
-export type SceneTriggerEventType =
-  | 'trigger_enter'
-  | 'trigger_exit'
+export type SceneTriggerEventType = 'trigger_enter' | 'trigger_exit'
 
 export interface SceneTriggerEvent {
   id: string

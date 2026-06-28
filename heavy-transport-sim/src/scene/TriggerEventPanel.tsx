@@ -4,9 +4,7 @@ interface TriggerEventPanelProps {
   events: SceneTriggerEvent[]
 }
 
-export default function TriggerEventPanel({
-  events,
-}: TriggerEventPanelProps) {
+export default function TriggerEventPanel({ events }: TriggerEventPanelProps) {
   if (events.length === 0) return null
 
   return (
@@ -26,7 +24,9 @@ export default function TriggerEventPanel({
         fontSize: '12px',
       }}
     >
-      <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '13px' }}>
+      <div
+        style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '13px' }}
+      >
         触发事件
       </div>
       {events.map((evt) => (
