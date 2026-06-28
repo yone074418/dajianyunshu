@@ -16,7 +16,8 @@
     "verify:supabase-env": "node scripts/verify-supabase-env.mjs",
     "verify:db-migrations": "node scripts/verify-db-migrations.mjs",
     "verify:rls-policies": "node scripts/verify-rls-policies.mjs",
-    "verify:g2": "node scripts/verify-g2-foundation.mjs"
+    "verify:g2": "node scripts/verify-g2-foundation.mjs",
+    "verify:week7": "node scripts/verify-week7-first-stage-flow.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",
