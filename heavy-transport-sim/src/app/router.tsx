@@ -8,6 +8,7 @@ import ForbiddenPage from '../pages/forbidden/ForbiddenPage'
 import SessionExpiredPage from '../pages/session-expired/SessionExpiredPage'
 import ExperimentPage from '../pages/experiment/ExperimentPage'
 import ScenePreviewPage from '../pages/scene-preview/ScenePreviewPage'
+import TaskIntroductionPage from '../pages/task-introduction/TaskIntroductionPage'
 import AuthGuard from './AuthGuard'
 import RoleGuard from './RoleGuard'
 
@@ -38,6 +39,16 @@ export const router = createBrowserRouter([
           <AuthGuard>
             <RoleGuard>
               <StudentPage />
+            </RoleGuard>
+          </AuthGuard>
+        ),
+      },
+      {
+        path: 'student/task-introduction',
+        element: (
+          <AuthGuard>
+            <RoleGuard>
+              <TaskIntroductionPage />
             </RoleGuard>
           </AuthGuard>
         ),
