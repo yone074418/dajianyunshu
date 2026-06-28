@@ -40,19 +40,6 @@ function readFile(p) {
   }
 }
 
-function gitBranchFiles(branch, pattern) {
-  try {
-    const out = execSync(`git ls-tree --name-only -r ${branch} -- ${pattern}`, {
-      cwd: GIT_ROOT,
-      encoding: 'utf-8',
-      timeout: 10000,
-    })
-    return out.trim().split('\n').filter(Boolean)
-  } catch {
-    return []
-  }
-}
-
 console.log('\n========================================')
 console.log('G3 三维底座验收静态检查')
 console.log('========================================\n')
@@ -106,23 +93,34 @@ check('TriggerEventPanel 存在', fileExists('src/scene/TriggerEventPanel.tsx'))
 check('useTriggerEvents 存在', fileExists('src/scene/useTriggerEvents.ts'))
 check('triggerTypes 存在', fileExists('src/scene/triggerTypes.ts'))
 
-// 6. 观察/漫游模式 (Day40 - 在分支中)
+// 6. 观察/漫游模式 (Day40)
 console.log('\n── 6. 观察/漫游模式 (Day40) ──')
-const day40Files = gitBranchFiles('origin/ai-codex/week6-day40-first-person-walkthrough', 'heavy-transport-sim/src/scene/')
-check('Day40 分支存在', day40Files.length > 0, `分支中有 ${day40Files.length} 个文件`)
-const hasFirstPerson = day40Files.some(f => f.includes('firstPerson') || f.includes('FirstPerson'))
-const hasViewMode = day40Files.some(f => f.includes('ViewMode') || f.includes('viewMode'))
-const hasModeToggle = day40Files.some(f => f.includes('ModeToggle'))
+const sceneIndex = readFile('src/scene/index.ts')
+const sceneCanvas = readFile('src/scene/SceneCanvas.tsx')
+const hasFirstPerson =
+  fileExists('src/scene/FirstPersonCamera.tsx') &&
+  fileExists('src/scene/useFirstPersonControls.ts') &&
+  fileExists('src/scene/firstPersonBoundary.ts')
+const hasViewMode =
+  fileExists('src/scene/useSceneViewMode.ts') &&
+  sceneCanvas.includes('useSceneViewMode')
+const hasModeToggle =
+  fileExists('src/scene/SceneModeToggle.tsx') &&
+  sceneCanvas.includes('SceneModeToggle')
+check('Day40 已合并到当前主线', hasFirstPerson && hasViewMode && hasModeToggle)
 check('Day40 包含第一人称控制', hasFirstPerson)
 check('Day40 包含视图模式切换', hasViewMode)
 check('Day40 包含模式切换按钮', hasModeToggle)
 
-// 7. 场景清理 (Day41 - 在分支中)
+// 7. 场景清理 (Day41)
 console.log('\n── 7. 场景清理 (Day41) ──')
-const day41Files = gitBranchFiles('origin/ai-codex/week6-day41-scene-cleanup-unload', 'heavy-transport-sim/src/scene/')
-check('Day41 分支存在', day41Files.length > 0, `分支中有 ${day41Files.length} 个文件`)
-const hasDispose = day41Files.some(f => f.includes('dispose'))
-const hasCleanup = day41Files.some(f => f.includes('Cleanup') || f.includes('cleanup'))
+const hasDispose =
+  fileExists('src/scene/disposeObject3D.ts') &&
+  sceneIndex.includes('disposeObject3D')
+const hasCleanup =
+  fileExists('src/scene/useSceneCleanup.ts') &&
+  sceneCanvas.includes('useSceneCleanup')
+check('Day41 已合并到当前主线', hasDispose && hasCleanup)
 check('Day41 包含 dispose 工具', hasDispose)
 check('Day41 包含 cleanup 机制', hasCleanup)
 
@@ -160,20 +158,12 @@ try {
 
 // 11. 验证记录
 console.log('\n── 11. 验证记录 ──')
-const mainDocs = gitBranchFiles('origin/main', 'heavy-transport-sim/docs/')
-const day36Branch = gitBranchFiles('origin/ai-codex/week6-day36-scene-canvas-loading', 'heavy-transport-sim/docs/')
-const day37Branch = gitBranchFiles('origin/ai-codex/week6-day37-camera-controls-boundaries', 'heavy-transport-sim/docs/')
-const day38Branch = gitBranchFiles('origin/ai-codex/week6-day38-model-pick-hover-highlight-tooltip', 'heavy-transport-sim/docs/')
-const day39Branch = gitBranchFiles('origin/ai-codex/week6-day39-rapier-colliders-triggers', 'heavy-transport-sim/docs/')
-const day40Branch = gitBranchFiles('origin/ai-codex/week6-day40-first-person-walkthrough', 'heavy-transport-sim/docs/')
-const day41Branch = gitBranchFiles('origin/ai-codex/week6-day41-scene-cleanup-unload', 'heavy-transport-sim/docs/')
-
-check('Day36 验证记录在分支中', day36Branch.some(f => f.includes('day36')))
-check('Day37 验证记录在分支中', day37Branch.some(f => f.includes('day37')))
-check('Day38 验证记录在分支中', day38Branch.some(f => f.includes('day38')))
-check('Day39 验证记录在分支中', day39Branch.some(f => f.includes('day39')))
-check('Day40 验证记录在分支中', day40Branch.some(f => f.includes('day40')))
-check('Day41 验证记录在分支中', day41Branch.some(f => f.includes('day41')))
+check('Day36 验证记录在当前主线中', fileExists('docs/day36-scene-canvas-loading-verification.md'))
+check('Day37 验证记录在当前主线中', fileExists('docs/day37-camera-controls-boundaries-verification.md'))
+check('Day38 验证记录在当前主线中', fileExists('docs/day38-model-pick-hover-highlight-tooltip-verification.md'))
+check('Day39 验证记录在当前主线中', fileExists('docs/day39-rapier-colliders-triggers-verification.md'))
+check('Day40 验证记录在当前主线中', fileExists('docs/day40-first-person-walkthrough-verification.md'))
+check('Day41 验证记录在当前主线中', fileExists('docs/day41-scene-cleanup-unload-verification.md'))
 
 // Summary
 console.log('\n========================================')
@@ -188,8 +178,7 @@ if (issues.length > 0) {
 }
 
 console.log('\n注意:')
-console.log('- Day40（漫游模式）和 Day41（场景清理）在独立分支中，未合并到 main。')
-console.log('- 分支内容已通过远程分支静态验证。')
+console.log('- Day40（漫游模式）和 Day41（场景清理）已合并到当前主线。')
 console.log('- 真实 WebGL/FPS/内存验证未在 CI 环境中执行。')
 
 process.exit(failed > 0 ? 1 : 0)

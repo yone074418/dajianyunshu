@@ -27,10 +27,10 @@
 | Day37 | 相机旋转、缩放、边界 | ✅ 已合并 main | `src/scene/SceneCameraControls.tsx` |
 | Day38 | 模型点选、悬停、高亮、提示 | ✅ 已合并 main | `src/scene/SelectableModel.tsx` 等 |
 | Day39 | Rapier 刚体、碰撞器、触发区 | ✅ 已合并 main | `src/scene/VehicleRigidBody.tsx` 等 |
-| Day40 | 第一人称漫游模式 | ⚠️ 在分支中 | `origin/ai-codex/week6-day40-first-person-walkthrough` |
-| Day41 | 模型清理与场景卸载 | ⚠️ 在分支中 | `origin/ai-codex/week6-day41-scene-cleanup-unload` |
+| Day40 | 第一人称漫游模式 | ✅ 已合并 main | `src/scene/FirstPersonCamera.tsx` 等 |
+| Day41 | 模型清理与场景卸载 | ✅ 已合并 main | `src/scene/useSceneCleanup.ts` 等 |
 
-**说明：** Day40 和 Day41 在独立分支中，未合并到 main。G3 静态检查通过远程分支验证这些实现的存在性。
+**说明：** Day40 和 Day41 已补全并合并到 main。G3 静态检查直接验证当前主线中的实现和验证记录。
 
 ## 5. G3 验收域总览
 
@@ -151,13 +151,13 @@
 
 ### 风险项
 
-1. Day40（漫游模式）和 Day41（场景清理）未合并到 main，G3 通过远程分支静态验证。
+1. 真实浏览器性能验收仍需人工补充截图或记录。
 2. 真实 WebGL FPS 未在 CI 环境中验证。
 3. 真实内存增长未在浏览器中验证。
 
 ### 待确认项
 
-1. Day40 和 Day41 需合并到 main 后才能在集成环境中验证。
+1. 真实浏览器中 FPS 和内存需手动验证。
 2. 真实浏览器中 FPS 和内存需手动验证。
 
 ## 18. G3 最终结论
@@ -166,7 +166,7 @@
 
 理由：
 1. Day36-Day39 已合并到 main，场景入口、Canvas、灯光、地面、加载、重试、相机控制、模型交互、Rapier 物理和触发区全部可验证。
-2. Day40 和 Day41 在独立分支中已实现并通过远程分支静态验证。
+2. Day40 和 Day41 已合并到 main，漫游模式和场景清理卸载机制可在当前主线验证。
 3. 所有本地质量命令通过（format:check, lint, test:run, test:e2e, build）。
 4. 无密钥泄露。
 5. 无 P0 阻断项。
@@ -176,4 +176,4 @@
 - 未实现 Day43 或后续功能
 - 未部署
 - 未创建 PR
-- 未合并 main
+- Day40-Day42 已合并 main

@@ -12,7 +12,8 @@ export default function ScenePreviewPage() {
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
       <h1>场景预览</h1>
       <p style={{ color: '#666', fontSize: '14px' }}>
-        Day40-Day41 三维底座验证 — 支持观察/漫游切换、键盘移动、安全边界、步骤切换、场景卸载和资源清理。
+        Day40-Day41 三维底座验证 —
+        支持观察/漫游切换、键盘移动、安全边界、步骤切换、场景卸载和资源清理。
       </p>
       <div
         style={{
