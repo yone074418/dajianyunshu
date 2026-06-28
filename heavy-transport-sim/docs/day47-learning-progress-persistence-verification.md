@@ -51,6 +51,9 @@ interface LearningProgressRecord {
 | `src/domain/useLearningProgress.ts` | 进度 hook |
 | `src/pages/learning/LearningCenterPage.tsx` | 更新页面集成进度 |
 | `src/pages/learning/LearningCenterPage.test.tsx` | 页面进度测试 |
+| `src/pages/teacher/LearningCompletionOverview.tsx` | 教师端完成度查看组件 |
+| `src/pages/teacher/LearningCompletionOverview.test.tsx` | 教师端完成度测试 |
+| `src/pages/teacher/TeacherPage.tsx` | 更新集成完成度组件 |
 | `src/app/router.tsx` | 新增 `/student/learning` 路由 |
 
 ## 8. 刷新恢复验证
@@ -85,7 +88,14 @@ interface LearningProgressRecord {
 | `npm run build` | ✅ 通过（4.05s） |
 | `git diff --check` | ✅ 无错误 |
 
-## 11. 声明
+## 11. 教师端完成度查看
+
+- 组件：`src/pages/teacher/LearningCompletionOverview.tsx`
+- 集成：`TeacherPage.tsx` 中引入
+- 功能：显示学生已读章节数、完成百分比、分类明细
+- 测试：6 个测试覆盖渲染、学生ID、完成百分比、分类明细、localStorage 数据读取、损坏存储容错
+
+## 12. 声明
 
 - 未接入真实数据库，使用 localStorage 本地持久化
 - 未实现 Day48 当前步骤提示框架
