@@ -6,8 +6,11 @@ import Ground from './Ground'
 import LoadingUI from './LoadingUI'
 import SceneErrorBoundary from './SceneErrorBoundary'
 import SceneCameraControls from './SceneCameraControls'
+import FirstPersonCamera from './FirstPersonCamera'
 import PlaceholderModels from './PlaceholderModels'
 import SceneInfoPanel from './SceneInfoPanel'
+import SceneModeToggle from './SceneModeToggle'
+import SceneWalkthroughHelp from './SceneWalkthroughHelp'
 import GroundCollider from './GroundCollider'
 import VehicleRigidBody from './VehicleRigidBody'
 import ObstacleCollider from './ObstacleCollider'
@@ -18,6 +21,7 @@ import { SCENE_PHYSICS_CONFIG } from './physicsConfig'
 import { SCENE_OBJECTS } from './sceneObjectMeta'
 import { useSceneInteraction } from './useSceneInteraction'
 import { useTriggerEvents } from './useTriggerEvents'
+import { useSceneViewMode } from './useSceneViewMode'
 
 interface SceneCanvasProps {
   style?: React.CSSProperties
@@ -25,6 +29,7 @@ interface SceneCanvasProps {
 
 export default function SceneCanvas({ style }: SceneCanvasProps) {
   const [retryKey, setRetryKey] = useState(0)
+  const mode = useSceneViewMode((s) => s.mode)
   const {
     hoveredObjectId,
     selectedObjectId,
@@ -70,7 +75,11 @@ export default function SceneCanvas({ style }: SceneCanvasProps) {
               <SceneLighting />
               <Ground />
               <GroundCollider />
-              <SceneCameraControls />
+              {mode === 'observe' ? (
+                <SceneCameraControls />
+              ) : (
+                <FirstPersonCamera />
+              )}
               <VehicleRigidBody id="tractor-6x6" position={[-3, 0.6, 0]}>
                 <PlaceholderModels
                   objects={SCENE_OBJECTS.filter(
@@ -120,6 +129,8 @@ export default function SceneCanvas({ style }: SceneCanvasProps) {
           isHovered={!!hoveredMeta && !selectedMeta}
         />
         <TriggerEventPanel events={events} />
+        <SceneModeToggle />
+        <SceneWalkthroughHelp />
       </SceneErrorBoundary>
     </div>
   )
