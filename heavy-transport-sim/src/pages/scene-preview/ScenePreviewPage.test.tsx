@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({
@@ -55,7 +55,7 @@ describe('ScenePreviewPage', () => {
 
   it('should render description', () => {
     render(<ScenePreviewPage />)
-    expect(screen.getByText(/Day39 物理交互底座/)).toBeInTheDocument()
+    expect(screen.getByText(/Day41 场景生命周期验证/)).toBeInTheDocument()
   })
 
   it('should render scene canvas', () => {
@@ -67,5 +67,32 @@ describe('ScenePreviewPage', () => {
     render(<ScenePreviewPage />)
     expect(screen.getByTestId('reset-camera')).toBeInTheDocument()
     expect(screen.getByText('重置视角')).toBeInTheDocument()
+  })
+
+  it('should render step buttons', () => {
+    render(<ScenePreviewPage />)
+    expect(screen.getByTestId('step-1')).toBeInTheDocument()
+    expect(screen.getByTestId('step-2')).toBeInTheDocument()
+    expect(screen.getByTestId('step-3')).toBeInTheDocument()
+    expect(screen.getByTestId('step-4')).toBeInTheDocument()
+    expect(screen.getByTestId('step-5')).toBeInTheDocument()
+  })
+
+  it('should show current step as 1 by default', () => {
+    render(<ScenePreviewPage />)
+    expect(screen.getByTestId('current-step')).toHaveTextContent('当前步骤: 1')
+  })
+
+  it('should switch step on button click', () => {
+    render(<ScenePreviewPage />)
+    fireEvent.click(screen.getByTestId('step-3'))
+    expect(screen.getByTestId('current-step')).toHaveTextContent('当前步骤: 3')
+  })
+
+  it('should still have only one canvas after step switch', () => {
+    const { container } = render(<ScenePreviewPage />)
+    fireEvent.click(screen.getByTestId('step-2'))
+    const canvases = container.querySelectorAll('[data-testid="scene-canvas"]')
+    expect(canvases.length).toBe(1)
   })
 })

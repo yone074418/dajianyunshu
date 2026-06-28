@@ -18,12 +18,14 @@ import { SCENE_PHYSICS_CONFIG } from './physicsConfig'
 import { SCENE_OBJECTS } from './sceneObjectMeta'
 import { useSceneInteraction } from './useSceneInteraction'
 import { useTriggerEvents } from './useTriggerEvents'
+import { useSceneCleanup } from './useSceneCleanup'
 
 interface SceneCanvasProps {
   style?: React.CSSProperties
+  sceneKey?: string | number
 }
 
-export default function SceneCanvas({ style }: SceneCanvasProps) {
+export default function SceneCanvas({ style, sceneKey }: SceneCanvasProps) {
   const [retryKey, setRetryKey] = useState(0)
   const {
     hoveredObjectId,
@@ -31,8 +33,16 @@ export default function SceneCanvas({ style }: SceneCanvasProps) {
     handlePointerOver,
     handlePointerOut,
     handleClick,
+    resetAll,
   } = useSceneInteraction()
-  const { events, recordEvent } = useTriggerEvents()
+  const { events, recordEvent, clearEvents } = useTriggerEvents()
+
+  const cleanup = useCallback(() => {
+    resetAll()
+    clearEvents()
+  }, [resetAll, clearEvents])
+
+  useSceneCleanup(sceneKey ?? 'default', cleanup)
 
   const handleRetry = useCallback(() => {
     setRetryKey((k) => k + 1)

@@ -1,13 +1,27 @@
+import { useState, useCallback } from 'react'
 import { SceneCanvas } from '../../scene'
 
 export default function ScenePreviewPage() {
+  const [stepId, setStepId] = useState(1)
+
+  const handleSwitchStep = useCallback((newStep: number) => {
+    setStepId(newStep)
+  }, [])
+
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
       <h1>场景预览</h1>
       <p style={{ color: '#666', fontSize: '14px' }}>
-        Day39 物理交互底座 — 支持刚体、碰撞器和触发区事件记录。
+        Day41 场景生命周期验证 — 支持步骤切换、场景卸载和资源清理。
       </p>
-      <div style={{ marginBottom: '12px' }}>
+      <div
+        style={{
+          marginBottom: '12px',
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'center',
+        }}
+      >
         <button
           data-testid="reset-camera"
           style={{
@@ -22,6 +36,33 @@ export default function ScenePreviewPage() {
         >
           重置视角
         </button>
+        <span style={{ fontSize: '13px', color: '#888', marginLeft: '8px' }}>
+          步骤切换：
+        </span>
+        {[1, 2, 3, 4, 5].map((step) => (
+          <button
+            key={step}
+            data-testid={`step-${step}`}
+            onClick={() => handleSwitchStep(step)}
+            style={{
+              padding: '6px 16px',
+              border: `1px solid ${stepId === step ? '#3d85c6' : '#ccc'}`,
+              borderRadius: '4px',
+              background: stepId === step ? '#3d85c6' : '#fff',
+              color: stepId === step ? '#fff' : '#333',
+              cursor: 'pointer',
+              fontSize: '13px',
+            }}
+          >
+            步骤 {step}
+          </button>
+        ))}
+        <span
+          data-testid="current-step"
+          style={{ fontSize: '12px', color: '#666', marginLeft: '8px' }}
+        >
+          当前步骤: {stepId}
+        </span>
       </div>
       <div
         style={{
@@ -30,7 +71,7 @@ export default function ScenePreviewPage() {
           overflow: 'hidden',
         }}
       >
-        <SceneCanvas />
+        <SceneCanvas key={`step-${stepId}`} sceneKey={`step-${stepId}`} />
       </div>
     </div>
   )
