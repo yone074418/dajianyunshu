@@ -1,22 +1,14 @@
-import { useState, useCallback } from 'react'
 import { SceneCanvas } from '../../scene'
 
 export default function ScenePreviewPage() {
-  const [cameraResetKey, setCameraResetKey] = useState(0)
-
-  const handleResetCamera = useCallback(() => {
-    setCameraResetKey((k) => k + 1)
-  }, [])
-
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
       <h1>场景预览</h1>
       <p style={{ color: '#666', fontSize: '14px' }}>
-        Day37 相机控制底座 — 支持旋转、缩放、重置和边界限制。
+        Day38 模型交互底座 — 支持悬停、点选、高亮和教学提示。
       </p>
       <div style={{ marginBottom: '12px' }}>
         <button
-          onClick={handleResetCamera}
           data-testid="reset-camera"
           style={{
             padding: '8px 20px',
@@ -38,7 +30,7 @@ export default function ScenePreviewPage() {
           overflow: 'hidden',
         }}
       >
-        <SceneCanvas cameraResetKey={cameraResetKey} />
+        <SceneCanvas />
       </div>
     </div>
   )

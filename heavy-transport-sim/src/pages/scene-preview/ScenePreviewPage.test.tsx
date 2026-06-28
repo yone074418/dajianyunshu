@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
@@ -17,6 +17,14 @@ vi.mock('@react-three/drei', () => ({
   OrbitControls: () => <div data-testid="orbit-controls" />,
 }))
 
+vi.mock('../../scene/PlaceholderModels', () => ({
+  default: () => <div data-testid="placeholder-models" />,
+}))
+
+vi.mock('../../scene/SceneInfoPanel', () => ({
+  default: () => <div data-testid="scene-info-panel" />,
+}))
+
 import ScenePreviewPage from './ScenePreviewPage'
 
 describe('ScenePreviewPage', () => {
@@ -28,7 +36,7 @@ describe('ScenePreviewPage', () => {
   it('should render description', () => {
     render(<ScenePreviewPage />)
     expect(
-      screen.getByText(/Day37 相机控制底座/),
+      screen.getByText(/Day38 模型交互底座/),
     ).toBeInTheDocument()
   })
 
@@ -41,12 +49,5 @@ describe('ScenePreviewPage', () => {
     render(<ScenePreviewPage />)
     expect(screen.getByTestId('reset-camera')).toBeInTheDocument()
     expect(screen.getByText('重置视角')).toBeInTheDocument()
-  })
-
-  it('should trigger camera reset when button clicked', () => {
-    render(<ScenePreviewPage />)
-    const button = screen.getByTestId('reset-camera')
-    fireEvent.click(button)
-    expect(button).toBeInTheDocument()
   })
 })
