@@ -33,7 +33,9 @@ export default function TeacherPage() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-lg font-medium text-gray-800 mb-4">教师首页</h2>
-          <p className="text-gray-600">功能将在后续任务实现</p>
+          <p className="text-gray-600">
+            查看学生知识学习完成度，辅助判断实验前置学习情况。
+          </p>
 
           <div className="mt-6 p-4 bg-green-50 rounded-lg">
             <p className="text-sm text-green-600">

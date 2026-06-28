@@ -11,6 +11,7 @@ import ScenePreviewPage from '../pages/scene-preview/ScenePreviewPage'
 import TaskIntroductionPage from '../pages/task-introduction/TaskIntroductionPage'
 import Cargo360Viewer from '../pages/cargo-viewer/Cargo360Viewer'
 import LearningCenterPage from '../pages/learning/LearningCenterPage'
+import VehicleCombinationPage from '../pages/vehicle-combinations/VehicleCombinationPage'
 import AuthGuard from './AuthGuard'
 import RoleGuard from './RoleGuard'
 
@@ -71,6 +72,16 @@ export const router = createBrowserRouter([
           <AuthGuard>
             <RoleGuard>
               <LearningCenterPage />
+            </RoleGuard>
+          </AuthGuard>
+        ),
+      },
+      {
+        path: 'student/vehicle-combinations',
+        element: (
+          <AuthGuard>
+            <RoleGuard>
+              <VehicleCombinationPage />
             </RoleGuard>
           </AuthGuard>
         ),
