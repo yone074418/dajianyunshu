@@ -17,6 +17,14 @@ vi.mock('@react-three/drei', () => ({
   OrbitControls: () => <div data-testid="orbit-controls" />,
 }))
 
+vi.mock('./PlaceholderModels', () => ({
+  default: () => <div data-testid="placeholder-models" />,
+}))
+
+vi.mock('./SceneInfoPanel', () => ({
+  default: () => <div data-testid="scene-info-panel" />,
+}))
+
 import SceneCanvas from './SceneCanvas'
 
 describe('SceneCanvas', () => {
