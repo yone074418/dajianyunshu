@@ -26,10 +26,16 @@ const CORRECT_INPUT: SimpleConfigurationInput = {
   },
 }
 
-export default function ConfigurationRulePage() {
+export default function ConfigurationRulePage({
+  input: inputOverride,
+}: {
+  input?: SimpleConfigurationInput
+} = {}) {
   const [result, setResult] =
     useState<SimpleConfigurationEvaluationResult | null>(null)
   const [hasChecked, setHasChecked] = useState(false)
+
+  const activeInput = inputOverride ?? CORRECT_INPUT
 
   const transportCase = useMemo(() => getUniqueTransportCase(), [])
   const combinations = useMemo(() => getVehicleCombinations(), [])
@@ -37,17 +43,17 @@ export default function ConfigurationRulePage() {
   const axleColumnRules = useMemo(() => getAxleColumnRules(), [])
 
   const combination = combinations.find(
-    (c) => c.id === CORRECT_INPUT.vehicleCombinationId,
+    (c) => c.id === activeInput.vehicleCombinationId,
   )
-  const tractor = tractors.find((t) => t.id === CORRECT_INPUT.tractorId)
+  const tractor = tractors.find((t) => t.id === activeInput.tractorId)
   const allowedRule = axleColumnRules.find(
     (r) =>
-      r.axleLines === CORRECT_INPUT.trailerSelection.axleLines &&
-      r.columns === CORRECT_INPUT.trailerSelection.columns,
+      r.axleLines === activeInput.trailerSelection.axleLines &&
+      r.columns === activeInput.trailerSelection.columns,
   )
 
   const handleCheck = () => {
-    const evaluation = evaluateSimpleConfiguration(CORRECT_INPUT)
+    const evaluation = evaluateSimpleConfiguration(activeInput)
     setResult(evaluation)
     setHasChecked(true)
   }
@@ -66,21 +72,21 @@ export default function ConfigurationRulePage() {
           <SummaryCard title="货物信息">
             <div>名称：{transportCase.cargo.name}</div>
             <div>
-              尺寸：{CORRECT_INPUT.cargo.lengthM} × {CORRECT_INPUT.cargo.widthM}{' '}
-              × {CORRECT_INPUT.cargo.heightM} m
+              尺寸：{activeInput.cargo.lengthM} × {activeInput.cargo.widthM} ×{' '}
+              {activeInput.cargo.heightM} m
             </div>
-            <div>重量：{CORRECT_INPUT.cargo.weightT} t</div>
+            <div>重量：{activeInput.cargo.weightT} t</div>
           </SummaryCard>
 
           <SummaryCard title="组合方式">
-            <div>{combination?.name ?? CORRECT_INPUT.vehicleCombinationId}</div>
+            <div>{combination?.name ?? activeInput.vehicleCombinationId}</div>
             <div style={{ fontSize: '12px', color: '#666' }}>
-              类型：{CORRECT_INPUT.vehicleCombinationType}
+              类型：{activeInput.vehicleCombinationType}
             </div>
           </SummaryCard>
 
           <SummaryCard title="牵引车">
-            <div>{tractor?.name ?? CORRECT_INPUT.tractorId}</div>
+            <div>{tractor?.name ?? activeInput.tractorId}</div>
             {tractor && (
               <div style={{ fontSize: '12px', color: '#666' }}>
                 功率：{tractor.power.enginePowerKw}kW | 驱动：
@@ -91,8 +97,8 @@ export default function ConfigurationRulePage() {
 
           <SummaryCard title="挂车选择">
             <div>
-              {CORRECT_INPUT.trailerSelection.axleLines} 轴线 ×{' '}
-              {CORRECT_INPUT.trailerSelection.columns} 纵列
+              {activeInput.trailerSelection.axleLines} 轴线 ×{' '}
+              {activeInput.trailerSelection.columns} 纵列
             </div>
             {allowedRule && (
               <div style={{ fontSize: '12px', color: '#666' }}>
