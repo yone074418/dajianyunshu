@@ -14,6 +14,7 @@ import LearningCenterPage from '../pages/learning/LearningCenterPage'
 import VehicleCombinationPage from '../pages/vehicle-combinations/VehicleCombinationPage'
 import TractorComparisonPage from '../pages/tractors/TractorComparisonPage'
 import TrailerSelectionPage from '../pages/trailer-selection/TrailerSelectionPage'
+import ConfigurationRulePage from '../pages/configuration-rules/ConfigurationRulePage'
 import AuthGuard from './AuthGuard'
 import RoleGuard from './RoleGuard'
 
@@ -104,6 +105,16 @@ export const router = createBrowserRouter([
           <AuthGuard>
             <RoleGuard>
               <TrailerSelectionPage />
+            </RoleGuard>
+          </AuthGuard>
+        ),
+      },
+      {
+        path: 'student/configuration-rules',
+        element: (
+          <AuthGuard>
+            <RoleGuard>
+              <ConfigurationRulePage />
             </RoleGuard>
           </AuthGuard>
         ),
