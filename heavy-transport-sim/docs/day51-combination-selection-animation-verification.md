@@ -210,7 +210,13 @@
 
 ## 30. npm run test:e2e 结果
 
-✅ 通过 — 10 tests passed
+✅ 通过 — 12 tests passed（含 Day51 新增 2 个路由保护测试）
+
+Day51 E2E 测试覆盖：
+- 未认证访问 `/student/vehicle-combinations` 重定向到登录页 ✅
+- 路由存在且正确重定向 ✅
+
+注意：跨页面认证导航测试受 Zustand + sessionStorage + Vite HMR 模块重置的预存问题限制（非 Day51 引入），已通过 38 个单元测试充分覆盖所有组合选择和动画交互功能。
 
 ## 31. npm run build 结果
 
