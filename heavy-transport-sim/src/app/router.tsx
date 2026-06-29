@@ -13,6 +13,7 @@ import Cargo360Viewer from '../pages/cargo-viewer/Cargo360Viewer'
 import LearningCenterPage from '../pages/learning/LearningCenterPage'
 import VehicleCombinationPage from '../pages/vehicle-combinations/VehicleCombinationPage'
 import TractorComparisonPage from '../pages/tractors/TractorComparisonPage'
+import TrailerSelectionPage from '../pages/trailer-selection/TrailerSelectionPage'
 import AuthGuard from './AuthGuard'
 import RoleGuard from './RoleGuard'
 
@@ -93,6 +94,16 @@ export const router = createBrowserRouter([
           <AuthGuard>
             <RoleGuard>
               <TractorComparisonPage />
+            </RoleGuard>
+          </AuthGuard>
+        ),
+      },
+      {
+        path: 'student/trailer-selection',
+        element: (
+          <AuthGuard>
+            <RoleGuard>
+              <TrailerSelectionPage />
             </RoleGuard>
           </AuthGuard>
         ),
