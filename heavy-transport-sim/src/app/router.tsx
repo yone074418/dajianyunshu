@@ -12,6 +12,7 @@ import TaskIntroductionPage from '../pages/task-introduction/TaskIntroductionPag
 import Cargo360Viewer from '../pages/cargo-viewer/Cargo360Viewer'
 import LearningCenterPage from '../pages/learning/LearningCenterPage'
 import VehicleCombinationPage from '../pages/vehicle-combinations/VehicleCombinationPage'
+import TractorComparisonPage from '../pages/tractors/TractorComparisonPage'
 import AuthGuard from './AuthGuard'
 import RoleGuard from './RoleGuard'
 
@@ -82,6 +83,16 @@ export const router = createBrowserRouter([
           <AuthGuard>
             <RoleGuard>
               <VehicleCombinationPage />
+            </RoleGuard>
+          </AuthGuard>
+        ),
+      },
+      {
+        path: 'student/tractors',
+        element: (
+          <AuthGuard>
+            <RoleGuard>
+              <TractorComparisonPage />
             </RoleGuard>
           </AuthGuard>
         ),
