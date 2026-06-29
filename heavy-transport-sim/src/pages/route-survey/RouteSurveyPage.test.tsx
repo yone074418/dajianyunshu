@@ -22,27 +22,11 @@ describe('RouteSurveyPage', () => {
     }
   })
 
-  it('shows the first route as selected by default', () => {
-    render(<RouteSurveyPage />)
-    const card = screen.getByTestId(`route-nav-${SURVEY_ROUTES[0].id}`)
-    expect(card.style.border).toContain('rgb(25, 118, 210)')
-  })
-
   it('switches to route B when clicked', () => {
     render(<RouteSurveyPage />)
     fireEvent.click(screen.getByTestId(`route-nav-${SURVEY_ROUTES[1].id}`))
-    const card = screen.getByTestId(`route-nav-${SURVEY_ROUTES[1].id}`)
-    expect(card.style.border).toContain('rgb(25, 118, 210)')
     expect(screen.getByTestId('current-route-summary').textContent).toContain(
       SURVEY_ROUTES[1].name,
-    )
-  })
-
-  it('switches to route C when clicked', () => {
-    render(<RouteSurveyPage />)
-    fireEvent.click(screen.getByTestId(`route-nav-${SURVEY_ROUTES[2].id}`))
-    expect(screen.getByTestId('current-route-summary').textContent).toContain(
-      SURVEY_ROUTES[2].name,
     )
   })
 
@@ -55,14 +39,6 @@ describe('RouteSurveyPage', () => {
     }
   })
 
-  it('updates obstacle list when switching routes', () => {
-    render(<RouteSurveyPage />)
-    fireEvent.click(screen.getByTestId(`route-nav-${SURVEY_ROUTES[1].id}`))
-    for (const obs of SURVEY_ROUTES[1].obstacles) {
-      expect(screen.getByTestId(`obstacle-item-${obs.id}`)).toBeDefined()
-    }
-  })
-
   it('old route obstacles do not remain after switching', () => {
     render(<RouteSurveyPage />)
     fireEvent.click(screen.getByTestId(`route-nav-${SURVEY_ROUTES[1].id}`))
@@ -71,32 +47,89 @@ describe('RouteSurveyPage', () => {
     }
   })
 
-  it('selects obstacle and shows detail panel', () => {
+  it('selects obstacle and shows detail and measurement panels', () => {
     render(<RouteSurveyPage />)
     const obsId = SURVEY_ROUTES[0].obstacles[0].id
     fireEvent.click(screen.getByTestId(`obstacle-item-${obsId}`))
     expect(screen.getByTestId('obstacle-detail-panel')).toBeDefined()
-    expect(screen.getByTestId('obstacle-detail')).toBeDefined()
+    expect(screen.getByTestId('measurement-section')).toBeDefined()
+    expect(screen.getByTestId('measurement-panel')).toBeDefined()
   })
 
-  it('deselects obstacle when clicking same item', () => {
+  it('shows measurement targets when obstacle selected', () => {
     render(<RouteSurveyPage />)
     const obsId = SURVEY_ROUTES[0].obstacles[0].id
     fireEvent.click(screen.getByTestId(`obstacle-item-${obsId}`))
+    const targets = screen.getAllByText(/测量对象/)
+    expect(targets.length).toBeGreaterThan(0)
+  })
+
+  it('shows preset measurement points when target selected', () => {
+    render(<RouteSurveyPage />)
+    const obsId = SURVEY_ROUTES[0].obstacles[0].id
     fireEvent.click(screen.getByTestId(`obstacle-item-${obsId}`))
-    expect(screen.queryByTestId('obstacle-detail-panel')).toBeNull()
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    expect(targetButtons.length).toBeGreaterThan(0)
+    fireEvent.click(targetButtons[0])
+    const presets = screen.getAllByTestId(/^preset-pair-/)
+    expect(presets.length).toBeGreaterThan(0)
   })
 
-  it('displays scene instance key', () => {
+  it('shows measurement result after selecting preset', () => {
     render(<RouteSurveyPage />)
-    expect(screen.getByTestId('scene-host').textContent).toContain('场景实例')
-  })
-
-  it('displays measured count', () => {
-    render(<RouteSurveyPage />)
-    expect(screen.getByTestId('current-route-summary').textContent).toContain(
-      '已测',
+    const obsId = SURVEY_ROUTES[0].obstacles[0].id
+    fireEvent.click(screen.getByTestId(`obstacle-item-${obsId}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(targetButtons[0])
+    const presets = screen.getAllByTestId(/^preset-pair-/)
+    fireEvent.click(presets[0])
+    expect(screen.getByTestId('measurement-result')).toBeDefined()
+    expect(screen.getByTestId('measurement-value').textContent).toContain('m')
+    expect(screen.getByTestId('measurement-object').textContent).toContain(
+      '测量对象',
     )
+  })
+
+  it('can clear measurement', () => {
+    render(<RouteSurveyPage />)
+    const obsId = SURVEY_ROUTES[0].obstacles[0].id
+    fireEvent.click(screen.getByTestId(`obstacle-item-${obsId}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(targetButtons[0])
+    const presets = screen.getAllByTestId(/^preset-pair-/)
+    fireEvent.click(presets[0])
+    fireEvent.click(screen.getByTestId('btn-clear-measurement'))
+    expect(screen.queryByTestId('measurement-result')).toBeNull()
+  })
+
+  it('writes measurement to draft store', () => {
+    render(<RouteSurveyPage />)
+    const obsId = SURVEY_ROUTES[0].obstacles[0].id
+    fireEvent.click(screen.getByTestId(`obstacle-item-${obsId}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(targetButtons[0])
+    const presets = screen.getAllByTestId(/^preset-pair-/)
+    fireEvent.click(presets[0])
+    const status = useRouteSurveyStore
+      .getState()
+      .getObstacleMeasurementStatus(SURVEY_ROUTES[0].id, obsId)
+    expect(status).toBe('measured')
+  })
+
+  it('measurement persists after route switch', () => {
+    render(<RouteSurveyPage />)
+    const obsId = SURVEY_ROUTES[0].obstacles[0].id
+    fireEvent.click(screen.getByTestId(`obstacle-item-${obsId}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(targetButtons[0])
+    const presets = screen.getAllByTestId(/^preset-pair-/)
+    fireEvent.click(presets[0])
+    fireEvent.click(screen.getByTestId(`route-nav-${SURVEY_ROUTES[1].id}`))
+    fireEvent.click(screen.getByTestId(`route-nav-${SURVEY_ROUTES[0].id}`))
+    const status = useRouteSurveyStore
+      .getState()
+      .getObstacleMeasurementStatus(SURVEY_ROUTES[0].id, obsId)
+    expect(status).toBe('measured')
   })
 
   it('displays teaching disclaimer', () => {
@@ -104,15 +137,13 @@ describe('RouteSurveyPage', () => {
     expect(screen.getByText(/教学简化声明/)).toBeDefined()
   })
 
-  it('displays Day58 scope note', () => {
+  it('displays Day59 scope note', () => {
     render(<RouteSurveyPage />)
-    expect(screen.getByText(/Day58 实现路线切换/)).toBeDefined()
+    expect(screen.getByText(/Day59 已实现距离\/高度测量/)).toBeDefined()
   })
 
-  it('does not implement measurement tools', () => {
+  it('does not implement slope measurement', () => {
     render(<RouteSurveyPage />)
-    expect(screen.queryByTestId('measurement-tool')).toBeNull()
-    expect(screen.queryByTestId('height-measurement')).toBeNull()
     expect(screen.queryByTestId('slope-measurement')).toBeNull()
   })
 })

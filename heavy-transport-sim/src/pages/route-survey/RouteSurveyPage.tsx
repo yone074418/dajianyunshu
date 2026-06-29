@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useCallback } from 'react'
+import { useMemo, useEffect, useCallback, useState } from 'react'
 import {
   getObstacleTypeSummary,
   validateSurveyRoutes,
@@ -7,6 +7,7 @@ import {
   type RouteObstacle,
 } from '../../domain/surveyRoutes'
 import { getSurveyRoutes } from '../../domain/surveyRouteData'
+import { getMeasurementTargetsForObstacle } from '../../domain/measurements'
 import { useRouteSurveyStore } from '../../stores/route-survey/routeSurveyStore'
 
 export default function RouteSurveyPage() {
@@ -165,10 +166,23 @@ export default function RouteSurveyPage() {
         </section>
       )}
 
+      {selectedObstacle && (
+        <section
+          data-testid="measurement-section"
+          style={{ marginTop: '20px' }}
+        >
+          <h2>测量工具</h2>
+          <MeasurementPanel
+            routeId={currentRouteId}
+            obstacle={selectedObstacle}
+          />
+        </section>
+      )}
+
       <div style={teachingNoteStyle}>
         <strong>教学简化声明：</strong>
-        本路线和障碍点数据为教学简化配置，不代表真实工程路线。
-        切换路线不丢失已测数据。测量工具将在 Day59—Day62 实现。
+        本路线和障碍点数据为教学简化配置，不代表真实工程路线。 Day59
+        已实现距离/高度测量工具。坡度、弯道、桥梁测量将在 Day60—Day62 实现。
       </div>
     </div>
   )
@@ -410,4 +424,233 @@ const teachingNoteStyle: React.CSSProperties = {
   background: '#fff3e0',
   borderRadius: '6px',
   fontSize: '12px',
+}
+
+function MeasurementPanel({
+  routeId,
+  obstacle,
+}: {
+  routeId: string
+  obstacle: RouteObstacle
+}) {
+  const targets = useMemo(
+    () => getMeasurementTargetsForObstacle(routeId, obstacle),
+    [routeId, obstacle],
+  )
+
+  const [activeTargetId, setActiveTargetId] = useState<string | null>(null)
+  const [selectedPairIndex, setSelectedPairIndex] = useState<number | null>(
+    null,
+  )
+  const [measurementResult, setMeasurementResult] = useState<{
+    value: number
+    unit: string
+    label: string
+    targetLabel: string
+  } | null>(null)
+
+  const activeTarget = targets.find((t) => t.id === activeTargetId) ?? null
+
+  const handleTargetSelect = (targetId: string) => {
+    setActiveTargetId(targetId)
+    setSelectedPairIndex(null)
+    setMeasurementResult(null)
+  }
+
+  const handlePresetSelect = (pairIndex: number) => {
+    if (!activeTarget?.suggestedPointPairs?.[pairIndex]) return
+    setSelectedPairIndex(pairIndex)
+    const pair = activeTarget.suggestedPointPairs[pairIndex]
+    const dx = pair.pointB[0] - pair.pointA[0]
+    const dy = pair.pointB[1] - pair.pointA[1]
+    const dz = pair.pointB[2] - pair.pointA[2]
+
+    let value: number
+    if (activeTarget.supportedTools.includes('height')) {
+      value = Math.abs(dy)
+    } else {
+      value = Math.sqrt(dx * dx + dy * dy + dz * dz)
+    }
+    value = Math.round(value * 100) / 100
+
+    setMeasurementResult({
+      value,
+      unit: 'm',
+      label: pair.label,
+      targetLabel: activeTarget.label,
+    })
+
+    useRouteSurveyStore.getState().upsertMeasurementDraft({
+      routeId,
+      obstacleId: obstacle.id,
+      measurementType: activeTarget.supportedTools.includes('height')
+        ? 'height'
+        : 'distance',
+      status: 'measured',
+      valueSummary: `${value} m`,
+      updatedAt: new Date().toISOString(),
+    })
+  }
+
+  const handleClear = () => {
+    setActiveTargetId(null)
+    setSelectedPairIndex(null)
+    setMeasurementResult(null)
+  }
+
+  if (targets.length === 0) {
+    return (
+      <div
+        data-testid="measurement-empty"
+        style={{ color: '#999', fontSize: '13px' }}
+      >
+        当前障碍无可测量对象。
+      </div>
+    )
+  }
+
+  return (
+    <div data-testid="measurement-panel">
+      <div style={{ marginBottom: '12px' }}>
+        <strong style={{ fontSize: '13px' }}>选择测量对象：</strong>
+        <div
+          style={{
+            display: 'flex',
+            gap: '8px',
+            marginTop: '8px',
+            flexWrap: 'wrap',
+          }}
+        >
+          {targets.map((t) => (
+            <button
+              key={t.id}
+              data-testid={`target-${t.id}`}
+              onClick={() => handleTargetSelect(t.id)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '4px',
+                border:
+                  activeTargetId === t.id
+                    ? '2px solid #1976d2'
+                    : '1px solid #d0d7de',
+                background: activeTargetId === t.id ? '#e3f2fd' : '#fff',
+                cursor: 'pointer',
+                fontSize: '12px',
+              }}
+            >
+              {t.label}
+              <div style={{ fontSize: '11px', color: '#666' }}>
+                {t.supportedTools.join(' / ')}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeTarget && (
+        <div
+          data-testid="measurement-target-detail"
+          style={{ marginBottom: '12px' }}
+        >
+          <div style={{ fontSize: '13px', color: '#555' }}>
+            {activeTarget.description}
+          </div>
+          {activeTarget.suggestedPointPairs &&
+            activeTarget.suggestedPointPairs.length > 0 && (
+              <div style={{ marginTop: '8px' }}>
+                <strong style={{ fontSize: '12px' }}>预设测量点：</strong>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '6px',
+                    marginTop: '4px',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  {activeTarget.suggestedPointPairs.map((pair, i) => (
+                    <button
+                      key={pair.id}
+                      data-testid={`preset-pair-${i}`}
+                      onClick={() => handlePresetSelect(i)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '4px',
+                        border:
+                          selectedPairIndex === i
+                            ? '2px solid #2e7d32'
+                            : '1px solid #d0d7de',
+                        background:
+                          selectedPairIndex === i ? '#e8f5e9' : '#fff',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                      }}
+                    >
+                      {pair.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+        </div>
+      )}
+
+      {measurementResult && (
+        <div
+          data-testid="measurement-result"
+          style={{
+            padding: '12px',
+            background: '#e8f5e9',
+            borderRadius: '6px',
+            marginTop: '8px',
+          }}
+        >
+          <div
+            style={{
+              fontWeight: 'bold',
+              fontSize: '14px',
+              marginBottom: '4px',
+            }}
+          >
+            测量结果
+          </div>
+          <div
+            data-testid="measurement-value"
+            style={{ fontSize: '18px', color: '#2e7d32' }}
+          >
+            {measurementResult.value} {measurementResult.unit}
+          </div>
+          <div
+            data-testid="measurement-object"
+            style={{ fontSize: '13px', marginTop: '4px' }}
+          >
+            测量对象：{measurementResult.targetLabel}
+          </div>
+          <div
+            data-testid="measurement-points"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            测量方式：{measurementResult.label}
+          </div>
+        </div>
+      )}
+
+      {measurementResult && (
+        <button
+          data-testid="btn-clear-measurement"
+          onClick={handleClear}
+          style={{
+            marginTop: '8px',
+            padding: '6px 16px',
+            border: '1px solid #d0d7de',
+            borderRadius: '4px',
+            background: '#fff',
+            cursor: 'pointer',
+            fontSize: '12px',
+          }}
+        >
+          清除测量
+        </button>
+      )}
+    </div>
+  )
 }
