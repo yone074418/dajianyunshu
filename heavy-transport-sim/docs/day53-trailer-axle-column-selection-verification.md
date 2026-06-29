@@ -21,10 +21,22 @@
 
 ## 4. 读取的设计依据文件
 
-1. 大件运输虚拟仿真实验教学系统_单人复刻126天计划.md — 确认 Day53 任务
-2. src/domain/vehicleCombinations.ts — 复用数据模式
-3. src/domain/tractors.ts — 复用数据模式
-4. src/app/router.tsx — 添加路由
+1. 大件运输虚拟仿真实验教学系统_单人复刻126天计划.md — 确认 Day53 任务（第171行）
+2. docs/用户与场景.md — 学生角色、六阶段流程
+3. docs/六阶段实验主流程.md — 第二阶段简单配车规则
+4. docs/学生端信息架构.md — 页面入口和导航
+5. docs/六阶段低保真原型.md — 简单配车原型 WF-S2-001（挂车轴线/纵列选择区域）
+6. docs/通用功能与页面清单.md — 页面编号
+7. docs/专业规则目录.md — VEH 规则分类
+8. docs/唯一运输案例说明.md — 案例参数
+9. docs/简单配车组合数据说明.md — 不存在，不阻断 Day53
+10. docs/牵引车参数说明.md — 不存在，不阻断 Day53
+11. heavy-transport-sim/docs/day50-vehicle-combination-data-verification.md — Day50 状态
+12. heavy-transport-sim/docs/day51-combination-selection-animation-verification.md — Day51 状态（未合入 main）
+13. heavy-transport-sim/docs/day52-tractor-parameters-comparison-verification.md — Day52 状态
+14. src/domain/vehicleCombinations.ts — 复用数据模式
+15. src/domain/tractors.ts — 复用数据模式
+16. src/app/router.tsx — 添加路由
 
 ## 5. Day50 / Day51 / Day52 前置状态
 
