@@ -15,6 +15,7 @@ import VehicleCombinationPage from '../pages/vehicle-combinations/VehicleCombina
 import TractorComparisonPage from '../pages/tractors/TractorComparisonPage'
 import TrailerSelectionPage from '../pages/trailer-selection/TrailerSelectionPage'
 import ConfigurationRulePage from '../pages/configuration-rules/ConfigurationRulePage'
+import ConfigurationTimelinePage from '../pages/teacher/ConfigurationTimelinePage'
 import AuthGuard from './AuthGuard'
 import RoleGuard from './RoleGuard'
 
@@ -145,6 +146,16 @@ export const router = createBrowserRouter([
           <AuthGuard>
             <RoleGuard>
               <TeacherPage />
+            </RoleGuard>
+          </AuthGuard>
+        ),
+      },
+      {
+        path: 'teacher/configuration-timeline',
+        element: (
+          <AuthGuard>
+            <RoleGuard>
+              <ConfigurationTimelinePage />
             </RoleGuard>
           </AuthGuard>
         ),
