@@ -10,6 +10,12 @@ import {
   measurementResultSchema,
   measurementTargetSchema,
   measurementPointSchema,
+  calculateHorizontalDistance,
+  calculateVerticalDistance,
+  calculateSlopePercent,
+  calculateSlopeAngleDeg,
+  createSlopeMeasurementResult,
+  validateSlopeMeasurementResult,
   type MeasurementPoint,
   type MeasurementTarget,
 } from './measurements'
@@ -364,5 +370,235 @@ describe('getAllMeasurementTargets', () => {
     const targets = getAllMeasurementTargets(SURVEY_ROUTES[0].id)
     const types = new Set(targets.map((t) => t.targetType))
     expect(types.size).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('Slope measurement calculations', () => {
+  it('calculateHorizontalDistance computes XZ plane distance', () => {
+    const h = calculateHorizontalDistance([0, 0, 0], [3, 10, 4])
+    expect(h).toBeCloseTo(5, 5)
+  })
+
+  it('calculateHorizontalDistance returns 0 for same XZ', () => {
+    expect(calculateHorizontalDistance([5, 0, 5], [5, 100, 5])).toBe(0)
+  })
+
+  it('calculateVerticalDistance computes Y axis difference', () => {
+    const v = calculateVerticalDistance([0, 0, 0], [100, 1.5, 200])
+    expect(v).toBeCloseTo(1.5, 5)
+  })
+
+  it('calculateVerticalDistance returns absolute value', () => {
+    const v = calculateVerticalDistance([0, 10, 0], [0, 3, 0])
+    expect(v).toBeCloseTo(7, 5)
+  })
+
+  it('calculateSlopePercent computes correct percentage', () => {
+    expect(calculateSlopePercent(20, 1.5)).toBeCloseTo(7.5, 5)
+  })
+
+  it('calculateSlopePercent returns 0 for zero horizontal', () => {
+    expect(calculateSlopePercent(0, 5)).toBe(0)
+  })
+
+  it('calculateSlopePercent returns 0 for zero vertical', () => {
+    expect(calculateSlopePercent(20, 0)).toBeCloseTo(0, 5)
+  })
+
+  it('calculateSlopeAngleDeg computes correct angle', () => {
+    const angle = calculateSlopeAngleDeg(20, 1.5)
+    expect(angle).toBeCloseTo(4.29, 1)
+  })
+
+  it('calculateSlopeAngleDeg returns 0 for zero horizontal', () => {
+    expect(calculateSlopeAngleDeg(0, 5)).toBe(0)
+  })
+})
+
+describe('createSlopeMeasurementResult', () => {
+  const pA = {
+    id: 'a',
+    label: '坡底',
+    position: [0, 0, 0] as [number, number, number],
+  }
+  const pB = {
+    id: 'b',
+    label: '坡顶',
+    position: [50, 3.75, 0] as [number, number, number],
+  }
+
+  it('creates valid slope result with process text', () => {
+    const r = createSlopeMeasurementResult(
+      'route_c_mountain_slope',
+      'obs_c1_mountain_slope',
+      'target_slope',
+      '山腰陡坡段 - 坡度',
+      pA,
+      pB,
+    )
+    expect('error' in r).toBe(false)
+    if (!('error' in r)) {
+      expect(r.toolType).toBe('slope')
+      expect(r.horizontalDistanceM).toBeCloseTo(50, 1)
+      expect(r.verticalDistanceM).toBeCloseTo(3.75, 1)
+      expect(r.slopePercent).toBeCloseTo(7.5, 1)
+      expect(r.unit).toBe('%')
+      expect(r.processText).toContain('水平距离')
+      expect(r.processText).toContain('垂直距离')
+      expect(r.processText).toContain('计算过程')
+      expect(r.processText).toContain('坡度结果')
+      expect(r.targetLabel).toBe('山腰陡坡段 - 坡度')
+    }
+  })
+
+  it('includes slope angle in result', () => {
+    const r = createSlopeMeasurementResult(
+      'route_c_mountain_slope',
+      'obs_c1_mountain_slope',
+      'target_slope',
+      'Test',
+      pA,
+      pB,
+    )
+    if (!('error' in r)) {
+      expect(r.slopeAngleDeg).toBeDefined()
+      expect(r.slopeAngleDeg!).toBeGreaterThan(0)
+    }
+  })
+
+  it('returns error for same points', () => {
+    const r = createSlopeMeasurementResult(
+      'route_c_mountain_slope',
+      'obs_c1_mountain_slope',
+      'target_slope',
+      'Test',
+      pA,
+      pA,
+    )
+    expect('error' in r).toBe(true)
+  })
+
+  it('returns error for zero horizontal distance', () => {
+    const sameXZ = {
+      id: 'c',
+      label: 'Same XZ',
+      position: [0, 100, 0] as [number, number, number],
+    }
+    const r = createSlopeMeasurementResult(
+      'route_c_mountain_slope',
+      'obs_c1_mountain_slope',
+      'target_slope',
+      'Test',
+      pA,
+      sameXZ,
+    )
+    expect('error' in r).toBe(true)
+  })
+
+  it('result writes to measurement draft via schema', () => {
+    const r = createSlopeMeasurementResult(
+      'route_c_mountain_slope',
+      'obs_c1_mountain_slope',
+      'target_slope',
+      'Test',
+      pA,
+      pB,
+    )
+    if (!('error' in r)) {
+      const v = validateSlopeMeasurementResult(r)
+      expect(v.success).toBe(true)
+    }
+  })
+})
+
+describe('validateSlopeMeasurementResult', () => {
+  const validResult = {
+    id: 'sr1',
+    routeId: 'route_c_mountain_slope',
+    obstacleId: 'obs_c1_mountain_slope',
+    targetId: 'target_slope',
+    targetLabel: 'Test',
+    toolType: 'slope' as const,
+    points: [
+      { id: 'a', label: 'A', position: [0, 0, 0] as [number, number, number] },
+      {
+        id: 'b',
+        label: 'B',
+        position: [50, 3.75, 0] as [number, number, number],
+      },
+    ],
+    horizontalDistanceM: 50,
+    verticalDistanceM: 3.75,
+    slopePercent: 7.5,
+    slopeAngleDeg: 4.29,
+    unit: '%' as const,
+    processText: '水平距离：50 m\n垂直距离：3.75 m',
+    valueLabel: '7.5%',
+    measuredAt: new Date().toISOString(),
+    source: 'manual_point_selection' as const,
+  }
+
+  it('valid result passes validation', () => {
+    const v = validateSlopeMeasurementResult(validResult)
+    expect(v.success).toBe(true)
+    expect(v.errors).toEqual([])
+  })
+
+  it('fails for nonexistent route', () => {
+    const v = validateSlopeMeasurementResult({
+      ...validResult,
+      routeId: 'nonexistent',
+    })
+    expect(v.success).toBe(false)
+    expect(v.errors.some((e) => e.includes('不存在'))).toBe(true)
+  })
+
+  it('fails for null input', () => {
+    const v = validateSlopeMeasurementResult(null)
+    expect(v.success).toBe(false)
+  })
+
+  it('fails for same points', () => {
+    const v = validateSlopeMeasurementResult({
+      ...validResult,
+      points: [
+        {
+          id: 'a',
+          label: 'A',
+          position: [0, 0, 0] as [number, number, number],
+        },
+        {
+          id: 'b',
+          label: 'B',
+          position: [0, 0, 0] as [number, number, number],
+        },
+      ],
+      horizontalDistanceM: 0,
+      slopePercent: 0,
+      valueLabel: '0%',
+      processText: 'test',
+    })
+    expect(v.success).toBe(false)
+  })
+})
+
+describe('Slope targets for slope obstacles', () => {
+  it('slope obstacle has slope target with slope tool', () => {
+    const obs = SURVEY_ROUTES[2].obstacles.find((o) => o.type === 'slope')!
+    const targets = getMeasurementTargetsForObstacle(SURVEY_ROUTES[2].id, obs)
+    const slopeTarget = targets.find((t) => t.supportedTools.includes('slope'))
+    expect(slopeTarget).toBeDefined()
+    expect(slopeTarget!.supportedTools).toContain('slope')
+    expect(slopeTarget!.suggestedPointPairs).toBeDefined()
+    expect(slopeTarget!.suggestedPointPairs!.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('slope obstacle still has height target', () => {
+    const obs = SURVEY_ROUTES[2].obstacles.find((o) => o.type === 'slope')!
+    const targets = getMeasurementTargetsForObstacle(SURVEY_ROUTES[2].id, obs)
+    const heightTarget = targets.find((t) =>
+      t.supportedTools.includes('height'),
+    )
+    expect(heightTarget).toBeDefined()
   })
 })

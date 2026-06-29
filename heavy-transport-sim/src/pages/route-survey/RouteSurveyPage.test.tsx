@@ -137,13 +137,58 @@ describe('RouteSurveyPage', () => {
     expect(screen.getByText(/教学简化声明/)).toBeDefined()
   })
 
-  it('displays Day59 scope note', () => {
+  it('displays Day60 scope note', () => {
     render(<RouteSurveyPage />)
     expect(screen.getByText(/Day59 已实现距离\/高度测量/)).toBeDefined()
   })
 
-  it('does not implement slope measurement', () => {
+  it('shows slope measurement for slope obstacle', () => {
     render(<RouteSurveyPage />)
-    expect(screen.queryByTestId('slope-measurement')).toBeNull()
+    fireEvent.click(screen.getByTestId(`route-nav-${SURVEY_ROUTES[2].id}`))
+    const slopeObs = SURVEY_ROUTES[2].obstacles.find((o) => o.type === 'slope')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${slopeObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    expect(targetButtons.length).toBeGreaterThanOrEqual(2)
+    const slopeTarget = targetButtons.find((b) =>
+      b.textContent?.includes('坡度'),
+    )
+    expect(slopeTarget).toBeDefined()
+  })
+
+  it('slope measurement shows horizontal distance, vertical distance, and process', () => {
+    render(<RouteSurveyPage />)
+    fireEvent.click(screen.getByTestId(`route-nav-${SURVEY_ROUTES[2].id}`))
+    const slopeObs = SURVEY_ROUTES[2].obstacles.find((o) => o.type === 'slope')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${slopeObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    const slopeTarget = targetButtons.find((b) =>
+      b.textContent?.includes('坡度'),
+    )
+    fireEvent.click(slopeTarget!)
+    const presets = screen.getAllByTestId(/^preset-pair-/)
+    fireEvent.click(presets[presets.length - 1])
+    expect(screen.getByTestId('measurement-result')).toBeDefined()
+    expect(screen.getByTestId('measurement-value').textContent).toContain('%')
+    expect(screen.getByTestId('measurement-horizontal')).toBeDefined()
+    expect(screen.getByTestId('measurement-vertical')).toBeDefined()
+    expect(screen.getByTestId('measurement-process')).toBeDefined()
+  })
+
+  it('slope measurement writes to draft store', () => {
+    render(<RouteSurveyPage />)
+    fireEvent.click(screen.getByTestId(`route-nav-${SURVEY_ROUTES[2].id}`))
+    const slopeObs = SURVEY_ROUTES[2].obstacles.find((o) => o.type === 'slope')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${slopeObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    const slopeTarget = targetButtons.find((b) =>
+      b.textContent?.includes('坡度'),
+    )
+    fireEvent.click(slopeTarget!)
+    const presets = screen.getAllByTestId(/^preset-pair-/)
+    fireEvent.click(presets[presets.length - 1])
+    const status = useRouteSurveyStore
+      .getState()
+      .getObstacleMeasurementStatus(SURVEY_ROUTES[2].id, slopeObs.id)
+    expect(status).toBe('measured')
   })
 })

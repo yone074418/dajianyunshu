@@ -9,6 +9,13 @@ export const MEASUREMENT_TOOL_TYPES_DAY59 = ['distance', 'height'] as const
 export type MeasurementToolTypeDay59 =
   (typeof MEASUREMENT_TOOL_TYPES_DAY59)[number]
 
+export const MEASUREMENT_TOOL_TYPES_ALL = [
+  'distance',
+  'height',
+  'slope',
+] as const
+export type MeasurementToolTypeAll = (typeof MEASUREMENT_TOOL_TYPES_ALL)[number]
+
 export const measurementPointSchema = z.object({
   id: nonEmptyString,
   label: nonEmptyString,
@@ -29,7 +36,7 @@ export const measurementTargetSchema = z.object({
   ]),
   label: nonEmptyString,
   description: nonEmptyString,
-  supportedTools: z.array(z.enum(['distance', 'height'])).min(1),
+  supportedTools: z.array(z.enum(['distance', 'height', 'slope'])).min(1),
   suggestedPointPairs: z
     .array(
       z.object({
@@ -328,6 +335,23 @@ export function getMeasurementTargetsForObstacle(
         },
       ],
     })
+    targets.push({
+      id: `target_${obstacle.id}_slope`,
+      routeId,
+      obstacleId: obstacle.id,
+      targetType: 'shoulder_distance',
+      label: `${obstacle.name} - 坡度`,
+      description: `测量${obstacle.name}的水平距离和垂直高差，计算坡度百分比`,
+      supportedTools: ['slope'],
+      suggestedPointPairs: [
+        {
+          id: `sp_${obstacle.id}_slope_points`,
+          label: '坡底起点 → 坡顶终点',
+          pointA: [obstacle.position[0] - 50, 0, obstacle.position[2]],
+          pointB: obstacle.position,
+        },
+      ],
+    })
   }
 
   return targets
@@ -339,4 +363,157 @@ export function getAllMeasurementTargets(routeId: string): MeasurementTarget[] {
   return route.obstacles.flatMap((obs) =>
     getMeasurementTargetsForObstacle(routeId, obs),
   )
+}
+
+export const slopeMeasurementResultSchema = z.object({
+  id: nonEmptyString,
+  routeId: nonEmptyString,
+  obstacleId: nonEmptyString,
+  targetId: nonEmptyString,
+  targetLabel: nonEmptyString,
+  toolType: z.literal('slope'),
+  points: z.tuple([measurementPointSchema, measurementPointSchema]),
+  horizontalDistanceM: z.number().positive(),
+  verticalDistanceM: z.number().min(0),
+  slopePercent: z.number().min(0),
+  slopeAngleDeg: z.number().min(0).optional(),
+  unit: z.literal('%'),
+  processText: nonEmptyString,
+  valueLabel: nonEmptyString,
+  measuredAt: nonEmptyString,
+  source: z.enum(['manual_point_selection', 'preset_point_pair']),
+})
+
+export type SlopeMeasurementResult = z.infer<
+  typeof slopeMeasurementResultSchema
+>
+
+export function calculateHorizontalDistance(
+  pointA: [number, number, number],
+  pointB: [number, number, number],
+): number {
+  const dx = pointB[0] - pointA[0]
+  const dz = pointB[2] - pointA[2]
+  return Math.sqrt(dx * dx + dz * dz)
+}
+
+export function calculateVerticalDistance(
+  pointA: [number, number, number],
+  pointB: [number, number, number],
+): number {
+  return Math.abs(pointB[1] - pointA[1])
+}
+
+export function calculateSlopePercent(
+  horizontalDistanceM: number,
+  verticalDistanceM: number,
+): number {
+  if (horizontalDistanceM <= 0) return 0
+  return (verticalDistanceM / horizontalDistanceM) * 100
+}
+
+export function calculateSlopeAngleDeg(
+  horizontalDistanceM: number,
+  verticalDistanceM: number,
+): number {
+  if (horizontalDistanceM <= 0) return 0
+  return (Math.atan(verticalDistanceM / horizontalDistanceM) * 180) / Math.PI
+}
+
+export function createSlopeMeasurementResult(
+  routeId: string,
+  obstacleId: string,
+  targetId: string,
+  targetLabel: string,
+  pointA: MeasurementPoint,
+  pointB: MeasurementPoint,
+): SlopeMeasurementResult | { error: string } {
+  const posA = pointA.position as [number, number, number]
+  const posB = pointB.position as [number, number, number]
+
+  const same = posA[0] === posB[0] && posA[1] === posB[1] && posA[2] === posB[2]
+  if (same) {
+    return { error: '起点和终点不能相同' }
+  }
+
+  const hDist = calculateHorizontalDistance(posA, posB)
+  if (hDist <= 0) {
+    return { error: '水平距离为零，无法计算坡度' }
+  }
+
+  const vDist = calculateVerticalDistance(posA, posB)
+  const slopePct = calculateSlopePercent(hDist, vDist)
+  const slopeAngle = calculateSlopeAngleDeg(hDist, vDist)
+
+  const hRounded = Math.round(hDist * 100) / 100
+  const vRounded = Math.round(vDist * 100) / 100
+  const pctRounded = Math.round(slopePct * 100) / 100
+  const angleRounded = Math.round(slopeAngle * 100) / 100
+
+  const processText = [
+    `水平距离：${hRounded} m`,
+    `垂直距离：${vRounded} m`,
+    `计算过程：${vRounded} ÷ ${hRounded} × 100 = ${pctRounded}%`,
+    `坡度结果：${pctRounded}%（约 ${angleRounded}°）`,
+  ].join('\n')
+
+  return {
+    id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    routeId,
+    obstacleId,
+    targetId,
+    targetLabel,
+    toolType: 'slope',
+    points: [pointA, pointB],
+    horizontalDistanceM: hRounded,
+    verticalDistanceM: vRounded,
+    slopePercent: pctRounded,
+    slopeAngleDeg: angleRounded,
+    unit: '%',
+    processText,
+    valueLabel: `${pctRounded}%`,
+    measuredAt: new Date().toISOString(),
+    source: 'manual_point_selection',
+  }
+}
+
+export function validateSlopeMeasurementResult(
+  result: unknown,
+): MeasurementValidationResult {
+  const errors: string[] = []
+  const parsed = slopeMeasurementResultSchema.safeParse(result)
+  if (!parsed.success) {
+    for (const issue of parsed.error.issues) {
+      const path = issue.path.length > 0 ? issue.path.join('.') + ': ' : ''
+      errors.push(path + issue.message)
+    }
+    return { success: false, errors }
+  }
+
+  const data = parsed.data
+  const [pA, pB] = data.points
+  const same =
+    pA.position[0] === pB.position[0] &&
+    pA.position[1] === pB.position[1] &&
+    pA.position[2] === pB.position[2]
+  if (same) {
+    errors.push('起点和终点不能相同')
+  }
+
+  if (data.horizontalDistanceM <= 0) {
+    errors.push('水平距离必须大于0')
+  }
+
+  const routeExists = SURVEY_ROUTES.some((r) => r.id === data.routeId)
+  if (!routeExists) {
+    errors.push(`路线 "${data.routeId}" 不存在`)
+  } else {
+    const route = SURVEY_ROUTES.find((r) => r.id === data.routeId)
+    const obsExists = route?.obstacles.some((o) => o.id === data.obstacleId)
+    if (!obsExists) {
+      errors.push(`障碍 "${data.obstacleId}" 不属于路线 "${data.routeId}"`)
+    }
+  }
+
+  return { success: errors.length === 0, errors }
 }

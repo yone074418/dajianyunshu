@@ -7,7 +7,13 @@ import {
   type RouteObstacle,
 } from '../../domain/surveyRoutes'
 import { getSurveyRoutes } from '../../domain/surveyRouteData'
-import { getMeasurementTargetsForObstacle } from '../../domain/measurements'
+import {
+  getMeasurementTargetsForObstacle,
+  calculateHorizontalDistance,
+  calculateVerticalDistance,
+  calculateSlopePercent,
+  calculateSlopeAngleDeg,
+} from '../../domain/measurements'
 import { useRouteSurveyStore } from '../../stores/route-survey/routeSurveyStore'
 
 export default function RouteSurveyPage() {
@@ -182,7 +188,8 @@ export default function RouteSurveyPage() {
       <div style={teachingNoteStyle}>
         <strong>教学简化声明：</strong>
         本路线和障碍点数据为教学简化配置，不代表真实工程路线。 Day59
-        已实现距离/高度测量工具。坡度、弯道、桥梁测量将在 Day60—Day62 实现。
+        已实现距离/高度测量工具，Day60 已实现坡度测量。弯道、桥梁测量将在
+        Day61—Day62 实现。
       </div>
     </div>
   )
@@ -447,6 +454,10 @@ function MeasurementPanel({
     unit: string
     label: string
     targetLabel: string
+    processText?: string
+    horizontalDistance?: number
+    verticalDistance?: number
+    slopeAngle?: number
   } | null>(null)
 
   const activeTarget = targets.find((t) => t.id === activeTargetId) ?? null
@@ -461,33 +472,67 @@ function MeasurementPanel({
     if (!activeTarget?.suggestedPointPairs?.[pairIndex]) return
     setSelectedPairIndex(pairIndex)
     const pair = activeTarget.suggestedPointPairs[pairIndex]
-    const dx = pair.pointB[0] - pair.pointA[0]
-    const dy = pair.pointB[1] - pair.pointA[1]
-    const dz = pair.pointB[2] - pair.pointA[2]
+    const posA = pair.pointA as [number, number, number]
+    const posB = pair.pointB as [number, number, number]
+    const dx = posB[0] - posA[0]
+    const dy = posB[1] - posA[1]
+    const dz = posB[2] - posA[2]
+
+    const isSlope = activeTarget.supportedTools.includes('slope')
 
     let value: number
-    if (activeTarget.supportedTools.includes('height')) {
+    let unit: string
+    let processText: string | undefined
+    let horizontalDistance: number | undefined
+    let verticalDistance: number | undefined
+    let slopeAngle: number | undefined
+
+    if (isSlope) {
+      const hDist = calculateHorizontalDistance(posA, posB)
+      const vDist = calculateVerticalDistance(posA, posB)
+      const pct = calculateSlopePercent(hDist, vDist)
+      const angle = calculateSlopeAngleDeg(hDist, vDist)
+      value = Math.round(pct * 100) / 100
+      unit = '%'
+      horizontalDistance = Math.round(hDist * 100) / 100
+      verticalDistance = Math.round(vDist * 100) / 100
+      slopeAngle = Math.round(angle * 100) / 100
+      processText = [
+        `水平距离：${horizontalDistance} m`,
+        `垂直距离：${verticalDistance} m`,
+        `计算过程：${verticalDistance} ÷ ${horizontalDistance} × 100 = ${value}%`,
+        `坡度结果：${value}%（约 ${slopeAngle}°）`,
+      ].join('\n')
+    } else if (activeTarget.supportedTools.includes('height')) {
       value = Math.abs(dy)
+      unit = 'm'
     } else {
       value = Math.sqrt(dx * dx + dy * dy + dz * dz)
+      unit = 'm'
     }
     value = Math.round(value * 100) / 100
 
     setMeasurementResult({
       value,
-      unit: 'm',
+      unit,
       label: pair.label,
       targetLabel: activeTarget.label,
+      processText,
+      horizontalDistance,
+      verticalDistance,
+      slopeAngle,
     })
 
     useRouteSurveyStore.getState().upsertMeasurementDraft({
       routeId,
       obstacleId: obstacle.id,
-      measurementType: activeTarget.supportedTools.includes('height')
-        ? 'height'
-        : 'distance',
+      measurementType: isSlope
+        ? 'slope'
+        : activeTarget.supportedTools.includes('height')
+          ? 'height'
+          : 'distance',
       status: 'measured',
-      valueSummary: `${value} m`,
+      valueSummary: `${value} ${unit}`,
       updatedAt: new Date().toISOString(),
     })
   }
@@ -631,6 +676,46 @@ function MeasurementPanel({
           >
             测量方式：{measurementResult.label}
           </div>
+          {measurementResult.horizontalDistance !== undefined && (
+            <div
+              data-testid="measurement-horizontal"
+              style={{ fontSize: '13px', marginTop: '4px' }}
+            >
+              水平距离：{measurementResult.horizontalDistance} m
+            </div>
+          )}
+          {measurementResult.verticalDistance !== undefined && (
+            <div
+              data-testid="measurement-vertical"
+              style={{ fontSize: '13px', marginTop: '4px' }}
+            >
+              垂直距离：{measurementResult.verticalDistance} m
+            </div>
+          )}
+          {measurementResult.slopeAngle !== undefined && (
+            <div
+              data-testid="measurement-angle"
+              style={{ fontSize: '13px', marginTop: '4px' }}
+            >
+              坡度角：约 {measurementResult.slopeAngle}°
+            </div>
+          )}
+          {measurementResult.processText && (
+            <div
+              data-testid="measurement-process"
+              style={{
+                fontSize: '12px',
+                color: '#1565c0',
+                marginTop: '8px',
+                whiteSpace: 'pre-line',
+                background: '#f5f5f5',
+                padding: '8px',
+                borderRadius: '4px',
+              }}
+            >
+              {measurementResult.processText}
+            </div>
+          )}
         </div>
       )}
 
