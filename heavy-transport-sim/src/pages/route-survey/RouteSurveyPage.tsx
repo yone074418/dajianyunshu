@@ -34,6 +34,11 @@ import {
   type BridgeInfoMeasurementResult,
 } from '../../domain/measurements'
 import { useRouteSurveyStore } from '../../stores/route-survey/routeSurveyStore'
+import {
+  evaluateCircularCurveClearance,
+  type CircularCurveClearanceInput,
+  type CircularCurveClearanceResult,
+} from '../../domain/circularCurveClearance'
 
 export default function RouteSurveyPage() {
   const routes = useMemo(() => getSurveyRoutes(), [])
@@ -204,12 +209,21 @@ export default function RouteSurveyPage() {
         </section>
       )}
 
+      {selectedObstacle && selectedObstacle.type === 'curve' && (
+        <section
+          data-testid="circular-curve-section"
+          style={{ marginTop: '20px' }}
+        >
+          <h2>圆弧弯道通过性检查</h2>
+          <CircularCurvePanel obstacle={selectedObstacle} />
+        </section>
+      )}
+
       <div style={teachingNoteStyle}>
         <strong>教学简化声明：</strong>
-        本路线和障碍点数据为教学简化配置，不代表真实工程路线。Day59
-        已实现距离/高度测量工具，Day60 已实现坡度测量，Day62
-        已实现桥梁信息查看和限载输入。 桥梁承载教学规则由 Day68
-        实现。本系统不做桥梁是否能通行的最终判断。
+        本路线和障碍点数据为教学简化配置，不代表真实工程路线。Day65
+        已实现圆弧弯道通过性规则。直交弯道规则由 Day66 实现，坡道牵引力规则由
+        Day67 实现，桥梁承载规则由 Day68 实现。本系统不做路线最终通行结论。
       </div>
     </div>
   )
@@ -1722,6 +1736,298 @@ function BridgeInfoForm({
             style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
           >
             测量对象：{result.targetLabel}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CircularCurvePanel({ obstacle }: { obstacle: RouteObstacle }) {
+  const [vehicleLength, setVehicleLength] = useState('16')
+  const [vehicleWidth, setVehicleWidth] = useState('2.55')
+  const [minTurningRadius, setMinTurningRadius] = useState('12')
+  const [curveRadius, setCurveRadius] = useState('')
+  const [entranceWidth, setEntranceWidth] = useState('')
+  const [exitWidth, setExitWidth] = useState('')
+  const [safetyMargin, setSafetyMargin] = useState('0')
+  const [result, setResult] = useState<CircularCurveClearanceResult | null>(
+    null,
+  )
+
+  const handleEvaluate = () => {
+    const input: CircularCurveClearanceInput = {
+      routeId: obstacle.routeId,
+      obstacleId: obstacle.id,
+      obstacleName: obstacle.name,
+      curveKind: 'circular_curve',
+      vehicle: {
+        totalLengthM: parseFloat(vehicleLength) || 0,
+        totalWidthM: parseFloat(vehicleWidth) || 0,
+        minTurningRadiusM: parseFloat(minTurningRadius) || 0,
+      },
+      curve: {
+        radiusM: parseFloat(curveRadius) || 0,
+        angleDeg: 90,
+        entranceWidthM: parseFloat(entranceWidth) || 0,
+        exitWidthM: parseFloat(exitWidth) || 0,
+      },
+      safetyMarginM: parseFloat(safetyMargin) || 0,
+      measurementSource: 'manual_input',
+    }
+    setResult(evaluateCircularCurveClearance(input))
+  }
+
+  const handleClear = () => {
+    setCurveRadius('')
+    setEntranceWidth('')
+    setExitWidth('')
+    setSafetyMargin('0')
+    setResult(null)
+  }
+
+  const statusColors: Record<string, string> = {
+    pass: '#2e7d32',
+    pass_with_warning: '#e65100',
+    fail: '#c62828',
+    blocked: '#999',
+  }
+
+  const statusLabels: Record<string, string> = {
+    pass: '通过',
+    pass_with_warning: '警告通过',
+    fail: '不通过',
+    blocked: '阻塞',
+  }
+
+  return (
+    <div data-testid="circular-curve-panel">
+      <div
+        style={{
+          padding: '12px',
+          background: '#f5f5f5',
+          borderRadius: '6px',
+          marginBottom: '12px',
+        }}
+      >
+        <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+          {obstacle.name}
+        </div>
+        <div style={{ fontSize: '13px', color: '#555', marginTop: '4px' }}>
+          {obstacle.description}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '8px' }}>
+        <strong style={{ fontSize: '12px' }}>车辆参数</strong>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gap: '8px',
+            marginTop: '4px',
+          }}
+        >
+          <label style={formLabelStyle}>
+            <span>车辆总长 (m)</span>
+            <input
+              data-testid="curve-vehicle-length"
+              type="number"
+              step="0.1"
+              value={vehicleLength}
+              onChange={(e) => setVehicleLength(e.target.value)}
+              style={formInputStyle}
+            />
+          </label>
+          <label style={formLabelStyle}>
+            <span>车辆总宽 (m)</span>
+            <input
+              data-testid="curve-vehicle-width"
+              type="number"
+              step="0.01"
+              value={vehicleWidth}
+              onChange={(e) => setVehicleWidth(e.target.value)}
+              style={formInputStyle}
+            />
+          </label>
+          <label style={formLabelStyle}>
+            <span>最小转弯半径 (m)</span>
+            <input
+              data-testid="curve-min-radius"
+              type="number"
+              step="0.1"
+              value={minTurningRadius}
+              onChange={(e) => setMinTurningRadius(e.target.value)}
+              style={formInputStyle}
+            />
+          </label>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '8px' }}>
+        <strong style={{ fontSize: '12px' }}>弯道参数</strong>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr 1fr',
+            gap: '8px',
+            marginTop: '4px',
+          }}
+        >
+          <label style={formLabelStyle}>
+            <span>弯道半径 (m) *</span>
+            <input
+              data-testid="curve-clearance-radius"
+              type="number"
+              step="0.1"
+              value={curveRadius}
+              onChange={(e) => setCurveRadius(e.target.value)}
+              style={formInputStyle}
+              placeholder="弯道半径"
+            />
+          </label>
+          <label style={formLabelStyle}>
+            <span>入口宽度 (m) *</span>
+            <input
+              data-testid="curve-clearance-entrance"
+              type="number"
+              step="0.1"
+              value={entranceWidth}
+              onChange={(e) => setEntranceWidth(e.target.value)}
+              style={formInputStyle}
+              placeholder="入口宽度"
+            />
+          </label>
+          <label style={formLabelStyle}>
+            <span>出口宽度 (m) *</span>
+            <input
+              data-testid="curve-clearance-exit"
+              type="number"
+              step="0.1"
+              value={exitWidth}
+              onChange={(e) => setExitWidth(e.target.value)}
+              style={formInputStyle}
+              placeholder="出口宽度"
+            />
+          </label>
+          <label style={formLabelStyle}>
+            <span>安全余量 (m)</span>
+            <input
+              data-testid="curve-clearance-margin"
+              type="number"
+              step="0.1"
+              value={safetyMargin}
+              onChange={(e) => setSafetyMargin(e.target.value)}
+              style={formInputStyle}
+            />
+          </label>
+        </div>
+      </div>
+
+      <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+        所需宽度 = 车辆总宽 + 外摆量(总长/半径×0.6) + 安全余量
+      </div>
+
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        <button
+          data-testid="btn-evaluate-curve"
+          onClick={handleEvaluate}
+          style={{
+            padding: '6px 16px',
+            border: '1px solid #1976d2',
+            borderRadius: '4px',
+            background: '#1976d2',
+            color: '#fff',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: 'bold',
+          }}
+        >
+          检查通过性
+        </button>
+        {result && (
+          <button
+            data-testid="btn-clear-curve-rule"
+            onClick={handleClear}
+            style={{
+              padding: '6px 16px',
+              border: '1px solid #d0d7de',
+              borderRadius: '4px',
+              background: '#fff',
+              cursor: 'pointer',
+              fontSize: '12px',
+            }}
+          >
+            清除
+          </button>
+        )}
+      </div>
+
+      {result && (
+        <div
+          data-testid="circular-curve-result"
+          style={{
+            padding: '12px',
+            background:
+              result.status === 'pass'
+                ? '#e8f5e9'
+                : result.status === 'pass_with_warning'
+                  ? '#fff3e0'
+                  : result.status === 'fail'
+                    ? '#ffebee'
+                    : '#f5f5f5',
+            borderRadius: '6px',
+            border: `1px solid ${statusColors[result.status]}`,
+          }}
+        >
+          <div
+            style={{
+              fontWeight: 'bold',
+              fontSize: '16px',
+              color: statusColors[result.status],
+              marginBottom: '8px',
+            }}
+            data-testid="circular-curve-status"
+          >
+            {statusLabels[result.status]}
+          </div>
+
+          <div
+            data-testid="circular-curve-summary"
+            style={{ fontSize: '13px', marginBottom: '8px' }}
+          >
+            {result.summary}
+          </div>
+
+          {result.requiredWidthM !== undefined && (
+            <div style={{ fontSize: '13px' }}>
+              所需宽度：{result.requiredWidthM.toFixed(2)} m
+            </div>
+          )}
+          {result.radiusMarginM !== undefined && (
+            <div style={{ fontSize: '13px' }}>
+              半径余量：{result.radiusMarginM.toFixed(2)} m
+            </div>
+          )}
+          {result.widthMarginM !== undefined && (
+            <div style={{ fontSize: '13px' }}>
+              宽度余量：{result.widthMarginM.toFixed(2)} m
+            </div>
+          )}
+
+          <div
+            style={{
+              fontSize: '12px',
+              color: '#1565c0',
+              marginTop: '8px',
+              fontStyle: 'italic',
+            }}
+          >
+            {result.teachingNote}
+          </div>
+
+          <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+            下一步：{result.nextAction}
           </div>
         </div>
       )}
