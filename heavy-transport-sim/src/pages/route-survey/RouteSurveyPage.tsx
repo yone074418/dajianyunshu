@@ -34,6 +34,11 @@ import {
   type BridgeInfoMeasurementResult,
 } from '../../domain/measurements'
 import { useRouteSurveyStore } from '../../stores/route-survey/routeSurveyStore'
+import {
+  evaluateHeightClearance,
+  type HeightClearanceInput,
+  type HeightClearanceRuleResult,
+} from '../../domain/heightClearance'
 
 export default function RouteSurveyPage() {
   const routes = useMemo(() => getSurveyRoutes(), [])
@@ -204,12 +209,25 @@ export default function RouteSurveyPage() {
         </section>
       )}
 
+      {selectedObstacle && selectedObstacle.type === 'height_limit' && (
+        <section
+          data-testid="height-clearance-section"
+          style={{ marginTop: '20px' }}
+        >
+          <h2>高度通过性检查</h2>
+          <HeightClearancePanel
+            routeId={currentRouteId}
+            obstacle={selectedObstacle}
+          />
+        </section>
+      )}
+
       <div style={teachingNoteStyle}>
         <strong>教学简化声明：</strong>
-        本路线和障碍点数据为教学简化配置，不代表真实工程路线。Day59
-        已实现距离/高度测量工具，Day60 已实现坡度测量，Day62
-        已实现桥梁信息查看和限载输入。 桥梁承载教学规则由 Day68
-        实现。本系统不做桥梁是否能通行的最终判断。
+        本路线和障碍点数据为教学简化配置，不代表真实工程路线。Day64
+        已实现高度通过性规则。圆弧弯道规则由 Day65 实现，直交弯道规则由 Day66
+        实现，坡道牵引力规则由 Day67 实现，桥梁承载规则由 Day68
+        实现。本系统不做路线最终通行结论。
       </div>
     </div>
   )
@@ -1722,6 +1740,248 @@ function BridgeInfoForm({
             style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
           >
             测量对象：{result.targetLabel}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function HeightClearancePanel({
+  routeId,
+  obstacle,
+}: {
+  routeId: string
+  obstacle: RouteObstacle
+}) {
+  const [clearanceHeight, setClearanceHeight] = useState('')
+  const [totalHeight, setTotalHeight] = useState('')
+  const [safetyMargin, setSafetyMargin] = useState('0')
+  const [result, setResult] = useState<HeightClearanceRuleResult | null>(null)
+
+  const handleEvaluate = () => {
+    const ch = parseFloat(clearanceHeight)
+    const th = parseFloat(totalHeight)
+    const sm = parseFloat(safetyMargin) || 0
+
+    const input: HeightClearanceInput = {
+      routeId,
+      obstacleId: obstacle.id,
+      obstacleName: obstacle.name,
+      measuredClearanceHeightM: isNaN(ch) ? undefined : ch,
+      totalTransportHeightM: isNaN(th) ? undefined : th,
+      safetyMarginM: sm,
+      measurementSource: 'manual_input',
+    }
+    setResult(evaluateHeightClearance(input))
+  }
+
+  const handleClear = () => {
+    setClearanceHeight('')
+    setTotalHeight('')
+    setSafetyMargin('0')
+    setResult(null)
+  }
+
+  const statusColors: Record<string, string> = {
+    pass: '#2e7d32',
+    pass_with_warning: '#e65100',
+    fail: '#c62828',
+    blocked: '#999',
+  }
+
+  const statusLabels: Record<string, string> = {
+    pass: '通过',
+    pass_with_warning: '警告通过',
+    fail: '不通过',
+    blocked: '阻塞',
+  }
+
+  return (
+    <div data-testid="height-clearance-panel">
+      <div
+        style={{
+          padding: '12px',
+          background: '#f5f5f5',
+          borderRadius: '6px',
+          marginBottom: '12px',
+        }}
+      >
+        <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+          {obstacle.name}
+        </div>
+        <div style={{ fontSize: '13px', color: '#555', marginTop: '4px' }}>
+          {obstacle.description}
+        </div>
+        <div style={{ fontSize: '12px', color: '#1565c0', marginTop: '4px' }}>
+          {obstacle.teachingNote}
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gap: '8px',
+          marginBottom: '12px',
+        }}
+      >
+        <label style={formLabelStyle}>
+          <span>限高值 (m) *</span>
+          <input
+            data-testid="height-clearance-input"
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={clearanceHeight}
+            onChange={(e) => setClearanceHeight(e.target.value)}
+            style={formInputStyle}
+            placeholder="测量限高"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>运输总高度 (m) *</span>
+          <input
+            data-testid="height-transport-input"
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={totalHeight}
+            onChange={(e) => setTotalHeight(e.target.value)}
+            style={formInputStyle}
+            placeholder="货物+车辆高度"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>安全余量 (m)</span>
+          <input
+            data-testid="height-margin-input"
+            type="number"
+            step="0.01"
+            min="0"
+            value={safetyMargin}
+            onChange={(e) => setSafetyMargin(e.target.value)}
+            style={formInputStyle}
+            placeholder="默认0"
+          />
+        </label>
+      </div>
+
+      <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+        计算公式：可用限高 = 测得限高 - 安全余量；运输总高度 ≤ 可用限高 → 通过
+      </div>
+
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        <button
+          data-testid="btn-evaluate-height"
+          onClick={handleEvaluate}
+          style={{
+            padding: '6px 16px',
+            border: '1px solid #1976d2',
+            borderRadius: '4px',
+            background: '#1976d2',
+            color: '#fff',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: 'bold',
+          }}
+        >
+          检查通过性
+        </button>
+        {result && (
+          <button
+            data-testid="btn-clear-height-rule"
+            onClick={handleClear}
+            style={{
+              padding: '6px 16px',
+              border: '1px solid #d0d7de',
+              borderRadius: '4px',
+              background: '#fff',
+              cursor: 'pointer',
+              fontSize: '12px',
+            }}
+          >
+            清除
+          </button>
+        )}
+      </div>
+
+      {result && (
+        <div
+          data-testid="height-clearance-result"
+          style={{
+            padding: '12px',
+            background:
+              result.status === 'pass'
+                ? '#e8f5e9'
+                : result.status === 'pass_with_warning'
+                  ? '#fff3e0'
+                  : result.status === 'fail'
+                    ? '#ffebee'
+                    : '#f5f5f5',
+            borderRadius: '6px',
+            border: `1px solid ${statusColors[result.status]}`,
+          }}
+        >
+          <div
+            style={{
+              fontWeight: 'bold',
+              fontSize: '16px',
+              color: statusColors[result.status],
+              marginBottom: '8px',
+            }}
+            data-testid="height-clearance-status"
+          >
+            {statusLabels[result.status]}
+          </div>
+
+          <div
+            data-testid="height-clearance-reason"
+            style={{ fontSize: '13px', marginBottom: '8px' }}
+          >
+            {result.reason}
+          </div>
+
+          {result.clearanceHeightM !== undefined && (
+            <div
+              data-testid="height-clearance-value"
+              style={{ fontSize: '13px' }}
+            >
+              限高值：{result.clearanceHeightM.toFixed(2)} m
+            </div>
+          )}
+          {result.totalTransportHeightM !== undefined && (
+            <div
+              data-testid="height-transport-value"
+              style={{ fontSize: '13px' }}
+            >
+              运输总高度：{result.totalTransportHeightM.toFixed(2)} m
+            </div>
+          )}
+          {result.differenceM !== undefined && (
+            <div data-testid="height-difference" style={{ fontSize: '13px' }}>
+              {result.differenceM >= 0 ? '余量' : '超出'}：
+              {Math.abs(result.differenceM).toFixed(2)} m
+            </div>
+          )}
+
+          <div
+            data-testid="height-teaching-note"
+            style={{
+              fontSize: '12px',
+              color: '#1565c0',
+              marginTop: '8px',
+              fontStyle: 'italic',
+            }}
+          >
+            {result.teachingNote}
+          </div>
+
+          <div
+            data-testid="height-next-action"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            下一步：{result.nextAction}
           </div>
         </div>
       )}

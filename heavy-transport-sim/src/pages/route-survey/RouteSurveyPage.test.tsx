@@ -137,9 +137,9 @@ describe('RouteSurveyPage', () => {
     expect(screen.getByText(/教学简化声明/)).toBeDefined()
   })
 
-  it('displays Day60 scope note', () => {
+  it('displays Day64 scope note', () => {
     render(<RouteSurveyPage />)
-    expect(screen.getByText(/Day59 已实现距离\/高度测量/)).toBeDefined()
+    expect(screen.getByText(/Day64 已实现高度通过性规则/)).toBeDefined()
   })
 
   it('shows slope measurement for slope obstacle', () => {
