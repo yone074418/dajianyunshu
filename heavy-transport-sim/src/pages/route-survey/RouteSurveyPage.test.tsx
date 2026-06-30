@@ -263,4 +263,55 @@ describe('RouteSurveyPage', () => {
     expect(screen.getByTestId('bridge-errors').textContent).toContain('车道数')
     expect(screen.queryByTestId('bridge-result')).toBeNull()
   })
+
+  it('evaluates height clearance for a height limit obstacle', () => {
+    render(<RouteSurveyPage />)
+    const route = SURVEY_ROUTES.find((r) =>
+      r.obstacles.some((o) => o.type === 'height_limit'),
+    )!
+    fireEvent.click(screen.getByTestId(`route-nav-${route.id}`))
+    const heightObs = route.obstacles.find((o) => o.type === 'height_limit')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${heightObs.id}`))
+
+    expect(screen.getByTestId('height-clearance-panel')).toBeDefined()
+    fireEvent.change(screen.getByTestId('height-clearance-input'), {
+      target: { value: '5' },
+    })
+    fireEvent.change(screen.getByTestId('height-transport-input'), {
+      target: { value: '4.5' },
+    })
+    fireEvent.click(screen.getByTestId('btn-evaluate-height'))
+
+    expect(screen.getByTestId('height-clearance-result')).toBeDefined()
+    expect(screen.getByTestId('height-clearance-status').textContent).toContain(
+      'pass',
+    )
+  })
+
+  it('evaluates circular curve clearance for a curve obstacle', () => {
+    render(<RouteSurveyPage />)
+    const route = SURVEY_ROUTES.find((r) =>
+      r.obstacles.some((o) => o.type === 'curve'),
+    )!
+    fireEvent.click(screen.getByTestId(`route-nav-${route.id}`))
+    const curveObs = route.obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+
+    expect(screen.getByTestId('circular-curve-panel')).toBeDefined()
+    fireEvent.change(screen.getByTestId('curve-clearance-radius'), {
+      target: { value: '25' },
+    })
+    fireEvent.change(screen.getByTestId('curve-clearance-entrance'), {
+      target: { value: '6' },
+    })
+    fireEvent.change(screen.getByTestId('curve-clearance-exit'), {
+      target: { value: '5.5' },
+    })
+    fireEvent.click(screen.getByTestId('btn-evaluate-curve'))
+
+    expect(screen.getByTestId('circular-curve-result')).toBeDefined()
+    expect(screen.getByTestId('circular-curve-status').textContent).toContain(
+      'pass',
+    )
+  })
 })

@@ -33,6 +33,16 @@ import {
   type BridgeDeckCondition,
   type BridgeInfoMeasurementResult,
 } from '../../domain/measurements'
+import {
+  evaluateHeightClearance,
+  type HeightClearanceInput,
+  type HeightClearanceRuleResult,
+} from '../../domain/heightClearance'
+import {
+  evaluateCircularCurveClearance,
+  type CircularCurveClearanceInput,
+  type CircularCurveClearanceResult,
+} from '../../domain/circularCurveClearance'
 import { useRouteSurveyStore } from '../../stores/route-survey/routeSurveyStore'
 
 export default function RouteSurveyPage() {
@@ -198,6 +208,32 @@ export default function RouteSurveyPage() {
         >
           <h2>测量工具</h2>
           <MeasurementPanel
+            routeId={currentRouteId}
+            obstacle={selectedObstacle}
+          />
+        </section>
+      )}
+
+      {selectedObstacle && selectedObstacle.type === 'height_limit' && (
+        <section
+          data-testid="height-clearance-section"
+          style={{ marginTop: '20px' }}
+        >
+          <h2>高度通过性检查</h2>
+          <HeightClearancePanel
+            routeId={currentRouteId}
+            obstacle={selectedObstacle}
+          />
+        </section>
+      )}
+
+      {selectedObstacle && selectedObstacle.type === 'curve' && (
+        <section
+          data-testid="circular-curve-section"
+          style={{ marginTop: '20px' }}
+        >
+          <h2>圆弧弯道通过性检查</h2>
+          <CircularCurvePanel
             routeId={currentRouteId}
             obstacle={selectedObstacle}
           />
@@ -497,6 +533,27 @@ const clearBtnStyle: React.CSSProperties = {
   background: '#fff',
   cursor: 'pointer',
   fontSize: '12px',
+}
+
+const rulePanelStyle: React.CSSProperties = {
+  padding: '12px',
+  border: '1px solid #d0d7de',
+  borderRadius: '6px',
+  background: '#fff',
+}
+
+const ruleGridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+  gap: '8px',
+}
+
+const ruleResultStyle: React.CSSProperties = {
+  padding: '12px',
+  background: '#e8f5e9',
+  borderRadius: '6px',
+  marginTop: '12px',
+  fontSize: '13px',
 }
 
 const curveResultBoxStyle: React.CSSProperties = {
@@ -1727,4 +1784,293 @@ function BridgeInfoForm({
       )}
     </div>
   )
+}
+
+function HeightClearancePanel({
+  routeId,
+  obstacle,
+}: {
+  routeId: string
+  obstacle: RouteObstacle
+}) {
+  const [clearanceHeight, setClearanceHeight] = useState('')
+  const [totalHeight, setTotalHeight] = useState('')
+  const [safetyMargin, setSafetyMargin] = useState('0')
+  const [result, setResult] = useState<HeightClearanceRuleResult | null>(null)
+
+  const handleEvaluate = () => {
+    const input: HeightClearanceInput = {
+      routeId,
+      obstacleId: obstacle.id,
+      obstacleName: obstacle.name,
+      measuredClearanceHeightM: parseOptionalNumber(clearanceHeight),
+      totalTransportHeightM: parseOptionalNumber(totalHeight),
+      safetyMarginM: parseOptionalNumber(safetyMargin) ?? 0,
+      measurementSource: 'manual_input',
+    }
+    setResult(evaluateHeightClearance(input))
+  }
+
+  return (
+    <div data-testid="height-clearance-panel" style={rulePanelStyle}>
+      <div style={ruleGridStyle}>
+        <label style={formLabelStyle}>
+          <span>限高值 (m)</span>
+          <input
+            data-testid="height-clearance-input"
+            type="number"
+            step="0.01"
+            value={clearanceHeight}
+            onChange={(e) => setClearanceHeight(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>运输总高度 (m)</span>
+          <input
+            data-testid="height-transport-input"
+            type="number"
+            step="0.01"
+            value={totalHeight}
+            onChange={(e) => setTotalHeight(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>安全余量 (m)</span>
+          <input
+            data-testid="height-margin-input"
+            type="number"
+            step="0.01"
+            value={safetyMargin}
+            onChange={(e) => setSafetyMargin(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+      </div>
+      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+        <button
+          data-testid="btn-evaluate-height"
+          onClick={handleEvaluate}
+          style={saveBtnStyle}
+        >
+          检查通过性
+        </button>
+        {result && (
+          <button
+            data-testid="btn-clear-height-rule"
+            onClick={() => setResult(null)}
+            style={clearBtnStyle}
+          >
+            清除
+          </button>
+        )}
+      </div>
+      {result && (
+        <div data-testid="height-clearance-result" style={ruleResultStyle}>
+          <div data-testid="height-clearance-status">
+            status: {result.status}
+          </div>
+          <div data-testid="height-clearance-reason">{result.reason}</div>
+          {result.clearanceHeightM !== undefined && (
+            <div data-testid="height-clearance-value">
+              clearance: {result.clearanceHeightM.toFixed(2)} m
+            </div>
+          )}
+          {result.totalTransportHeightM !== undefined && (
+            <div data-testid="height-transport-value">
+              transport: {result.totalTransportHeightM.toFixed(2)} m
+            </div>
+          )}
+          {result.differenceM !== undefined && (
+            <div data-testid="height-difference">
+              margin: {result.differenceM.toFixed(2)} m
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CircularCurvePanel({
+  routeId,
+  obstacle,
+}: {
+  routeId: string
+  obstacle: RouteObstacle
+}) {
+  const [vehicleLength, setVehicleLength] = useState('16')
+  const [vehicleWidth, setVehicleWidth] = useState('2.55')
+  const [minTurningRadius, setMinTurningRadius] = useState('12')
+  const [curveRadius, setCurveRadius] = useState('')
+  const [curveAngle, setCurveAngle] = useState('90')
+  const [entranceWidth, setEntranceWidth] = useState('')
+  const [exitWidth, setExitWidth] = useState('')
+  const [safetyMargin, setSafetyMargin] = useState('0.3')
+  const [result, setResult] = useState<CircularCurveClearanceResult | null>(
+    null,
+  )
+
+  const handleEvaluate = () => {
+    const input: CircularCurveClearanceInput = {
+      routeId,
+      obstacleId: obstacle.id,
+      obstacleName: obstacle.name,
+      curveKind: 'circular_curve',
+      vehicle: {
+        totalLengthM: parseRequiredNumber(vehicleLength),
+        totalWidthM: parseRequiredNumber(vehicleWidth),
+        minTurningRadiusM: parseRequiredNumber(minTurningRadius),
+      },
+      curve: {
+        radiusM: parseRequiredNumber(curveRadius),
+        angleDeg: parseRequiredNumber(curveAngle),
+        entranceWidthM: parseRequiredNumber(entranceWidth),
+        exitWidthM: parseRequiredNumber(exitWidth),
+      },
+      safetyMarginM: parseOptionalNumber(safetyMargin) ?? 0,
+      measurementSource: 'manual_input',
+    }
+    setResult(evaluateCircularCurveClearance(input))
+  }
+
+  return (
+    <div data-testid="circular-curve-panel" style={rulePanelStyle}>
+      <div style={ruleGridStyle}>
+        <label style={formLabelStyle}>
+          <span>车辆总长 (m)</span>
+          <input
+            data-testid="curve-vehicle-length"
+            type="number"
+            step="0.01"
+            value={vehicleLength}
+            onChange={(e) => setVehicleLength(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>车辆总宽 (m)</span>
+          <input
+            data-testid="curve-vehicle-width"
+            type="number"
+            step="0.01"
+            value={vehicleWidth}
+            onChange={(e) => setVehicleWidth(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>最小转弯半径 (m)</span>
+          <input
+            data-testid="curve-min-radius"
+            type="number"
+            step="0.01"
+            value={minTurningRadius}
+            onChange={(e) => setMinTurningRadius(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>弯道半径 (m)</span>
+          <input
+            data-testid="curve-clearance-radius"
+            type="number"
+            step="0.01"
+            value={curveRadius}
+            onChange={(e) => setCurveRadius(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>弯道夹角 (deg)</span>
+          <input
+            data-testid="curve-clearance-angle"
+            type="number"
+            step="0.01"
+            value={curveAngle}
+            onChange={(e) => setCurveAngle(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>入口宽度 (m)</span>
+          <input
+            data-testid="curve-clearance-entrance"
+            type="number"
+            step="0.01"
+            value={entranceWidth}
+            onChange={(e) => setEntranceWidth(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>出口宽度 (m)</span>
+          <input
+            data-testid="curve-clearance-exit"
+            type="number"
+            step="0.01"
+            value={exitWidth}
+            onChange={(e) => setExitWidth(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>安全余量 (m)</span>
+          <input
+            data-testid="curve-clearance-margin"
+            type="number"
+            step="0.01"
+            value={safetyMargin}
+            onChange={(e) => setSafetyMargin(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+      </div>
+      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+        <button
+          data-testid="btn-evaluate-curve"
+          onClick={handleEvaluate}
+          style={saveBtnStyle}
+        >
+          检查通过性
+        </button>
+        {result && (
+          <button
+            data-testid="btn-clear-curve-rule"
+            onClick={() => setResult(null)}
+            style={clearBtnStyle}
+          >
+            清除
+          </button>
+        )}
+      </div>
+      {result && (
+        <div data-testid="circular-curve-result" style={ruleResultStyle}>
+          <div data-testid="circular-curve-status">status: {result.status}</div>
+          <div data-testid="circular-curve-summary">{result.summary}</div>
+          {result.radiusMarginM !== undefined && (
+            <div data-testid="circular-curve-radius-margin">
+              radius margin: {result.radiusMarginM.toFixed(2)} m
+            </div>
+          )}
+          {result.widthMarginM !== undefined && (
+            <div data-testid="circular-curve-width-margin">
+              width margin: {result.widthMarginM.toFixed(2)} m
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function parseOptionalNumber(value: string): number | undefined {
+  if (value.trim() === '') return undefined
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+function parseRequiredNumber(value: string): number {
+  return parseOptionalNumber(value) ?? 0
 }
