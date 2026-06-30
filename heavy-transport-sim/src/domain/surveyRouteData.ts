@@ -169,6 +169,9 @@ export const SURVEY_ROUTES: SurveyRoute[] = [
           unit: 't',
           vehiclePlusCargoWeight: 168,
           bridgeSpan: null,
+          bridgeKind: 'medium_bridge',
+          deckWidth: null,
+          bridgeLength: null,
         },
         teachingNote:
           '桥梁承载能力需要逐桥核实。车货总重168t对桥梁承载是重要考验，必须确认桥梁设计荷载。',
@@ -306,6 +309,9 @@ export const SURVEY_ROUTES: SurveyRoute[] = [
           unit: 't',
           vehiclePlusCargoWeight: 168,
           bridgeSpan: null,
+          bridgeKind: 'small_bridge',
+          deckWidth: null,
+          bridgeLength: null,
         },
         teachingNote:
           '山区桥梁承载能力通常低于城市桥梁，需要特别关注。同时桥面宽度可能受限。',

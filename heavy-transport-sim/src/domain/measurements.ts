@@ -13,8 +13,73 @@ export const MEASUREMENT_TOOL_TYPES_ALL = [
   'distance',
   'height',
   'slope',
+  'bridge',
 ] as const
 export type MeasurementToolTypeAll = (typeof MEASUREMENT_TOOL_TYPES_ALL)[number]
+
+export const BRIDGE_KINDS = [
+  'small_bridge',
+  'medium_bridge',
+  'large_bridge',
+  'culvert_bridge',
+  'temporary_bridge',
+] as const
+export type BridgeKind = (typeof BRIDGE_KINDS)[number]
+
+export const BRIDGE_KIND_LABELS: Record<BridgeKind, string> = {
+  small_bridge: '小型桥梁',
+  medium_bridge: '中型桥梁',
+  large_bridge: '大型桥梁',
+  culvert_bridge: '涵洞桥',
+  temporary_bridge: '临时桥梁',
+}
+
+export const BRIDGE_PARAMETER_SOURCES = [
+  'field_sign',
+  'survey_document',
+  'teacher_provided',
+  'teaching_config',
+  'manual_input',
+] as const
+export type BridgeParameterSource = (typeof BRIDGE_PARAMETER_SOURCES)[number]
+
+export const BRIDGE_PARAMETER_SOURCE_LABELS: Record<
+  BridgeParameterSource,
+  string
+> = {
+  field_sign: '现场标牌',
+  survey_document: '资料查询',
+  teacher_provided: '教师给定',
+  teaching_config: '教学配置',
+  manual_input: '手动录入',
+}
+
+export const BRIDGE_DECK_CONDITIONS = [
+  'good',
+  'normal',
+  'poor',
+  'unknown',
+] as const
+export type BridgeDeckCondition = (typeof BRIDGE_DECK_CONDITIONS)[number]
+
+export const BRIDGE_DECK_CONDITION_LABELS: Record<BridgeDeckCondition, string> =
+  {
+    good: '良好',
+    normal: '一般',
+    poor: '较差',
+    unknown: '未知',
+  }
+
+export const BRIDGE_LOAD_LIMIT_MIN = 5
+export const BRIDGE_LOAD_LIMIT_MAX = 500
+export const BRIDGE_DECK_WIDTH_MIN = 3
+export const BRIDGE_DECK_WIDTH_MAX = 30
+export const BRIDGE_LENGTH_MIN = 5
+export const BRIDGE_LENGTH_MAX = 3000
+export const BRIDGE_CLEARANCE_MIN = 2
+export const BRIDGE_CLEARANCE_MAX = 15
+export const BRIDGE_LANE_COUNT_MIN = 1
+export const BRIDGE_LANE_COUNT_MAX = 8
 
 export const measurementPointSchema = z.object({
   id: nonEmptyString,
@@ -33,10 +98,13 @@ export const measurementTargetSchema = z.object({
     'road_width',
     'obstacle_distance',
     'shoulder_distance',
+    'bridge_info',
   ]),
   label: nonEmptyString,
   description: nonEmptyString,
-  supportedTools: z.array(z.enum(['distance', 'height', 'slope'])).min(1),
+  supportedTools: z
+    .array(z.enum(['distance', 'height', 'slope', 'bridge']))
+    .min(1),
   suggestedPointPairs: z
     .array(
       z.object({
@@ -46,6 +114,16 @@ export const measurementTargetSchema = z.object({
         pointB: positionTuple,
       }),
     )
+    .optional(),
+  bridgeKind: z.enum(BRIDGE_KINDS).optional(),
+  presetBridgeParams: z
+    .object({
+      bridgeName: z.string().optional(),
+      bridgeKind: z.enum(BRIDGE_KINDS).optional(),
+      deckWidthM: z.number().positive().optional(),
+      bridgeLengthM: z.number().positive().optional(),
+      loadLimitT: z.number().positive().optional(),
+    })
     .optional(),
 })
 
@@ -287,6 +365,36 @@ export function getMeasurementTargetsForObstacle(
         },
       ],
     })
+    const bridgeKind: BridgeKind =
+      (obstacle.measurementPlaceholders?.bridgeKind as BridgeKind) ??
+      'medium_bridge'
+    targets.push({
+      id: `target_${obstacle.id}_bridge_info`,
+      routeId,
+      obstacleId: obstacle.id,
+      targetType: 'bridge_info',
+      label: `${obstacle.name} - 桥梁信息`,
+      description: `查看${obstacle.name}的基础信息并录入限载值`,
+      supportedTools: ['bridge'],
+      bridgeKind,
+      presetBridgeParams: {
+        bridgeName: obstacle.name,
+        bridgeKind,
+        deckWidthM:
+          typeof obstacle.measurementPlaceholders?.deckWidth === 'number'
+            ? obstacle.measurementPlaceholders.deckWidth
+            : undefined,
+        bridgeLengthM:
+          typeof obstacle.measurementPlaceholders?.bridgeLength === 'number'
+            ? obstacle.measurementPlaceholders.bridgeLength
+            : undefined,
+        loadLimitT:
+          typeof obstacle.measurementPlaceholders?.bridgeLoadCapacity ===
+          'number'
+            ? obstacle.measurementPlaceholders.bridgeLoadCapacity
+            : undefined,
+      },
+    })
   }
 
   if (obstacle.type === 'curve') {
@@ -516,4 +624,199 @@ export function validateSlopeMeasurementResult(
   }
 
   return { success: errors.length === 0, errors }
+}
+
+export const bridgeInfoMeasurementResultSchema = z.object({
+  id: nonEmptyString,
+  routeId: nonEmptyString,
+  obstacleId: nonEmptyString,
+  targetId: nonEmptyString,
+  targetLabel: nonEmptyString,
+  toolType: z.literal('bridge'),
+  bridgeName: nonEmptyString,
+  bridgeKind: z.enum(BRIDGE_KINDS),
+  loadLimitT: z.number().min(BRIDGE_LOAD_LIMIT_MIN).max(BRIDGE_LOAD_LIMIT_MAX),
+  deckWidthM: z.number().min(BRIDGE_DECK_WIDTH_MIN).max(BRIDGE_DECK_WIDTH_MAX),
+  bridgeLengthM: z.number().min(BRIDGE_LENGTH_MIN).max(BRIDGE_LENGTH_MAX),
+  clearanceHeightM: z
+    .number()
+    .min(BRIDGE_CLEARANCE_MIN)
+    .max(BRIDGE_CLEARANCE_MAX)
+    .optional(),
+  laneCount: z
+    .number()
+    .int()
+    .min(BRIDGE_LANE_COUNT_MIN)
+    .max(BRIDGE_LANE_COUNT_MAX)
+    .optional(),
+  deckCondition: z.enum(BRIDGE_DECK_CONDITIONS).optional(),
+  allowMeeting: z.boolean().optional(),
+  source: z.enum(BRIDGE_PARAMETER_SOURCES),
+  valueLabel: nonEmptyString,
+  measuredAt: nonEmptyString,
+  notes: z.string().optional(),
+})
+
+export type BridgeInfoMeasurementResult = z.infer<
+  typeof bridgeInfoMeasurementResultSchema
+>
+
+export function createBridgeInfoMeasurementResult(input: {
+  routeId: string
+  obstacleId: string
+  targetId: string
+  targetLabel: string
+  bridgeName: string
+  bridgeKind: BridgeKind
+  loadLimitT: number
+  deckWidthM: number
+  bridgeLengthM: number
+  clearanceHeightM?: number
+  laneCount?: number
+  deckCondition?: BridgeDeckCondition
+  allowMeeting?: boolean
+  source: BridgeParameterSource
+  notes?: string
+}): BridgeInfoMeasurementResult | { error: string } {
+  const errs: string[] = []
+  if (!input.routeId) errs.push('routeId 不能为空')
+  if (!input.obstacleId) errs.push('obstacleId 不能为空')
+  if (!input.targetId) errs.push('targetId 不能为空')
+  if (!input.targetLabel) errs.push('targetLabel 不能为空')
+  if (!input.bridgeName) errs.push('桥梁名称不能为空')
+  if (
+    input.loadLimitT === undefined ||
+    input.loadLimitT === null ||
+    isNaN(input.loadLimitT)
+  )
+    errs.push('限载值不能为空')
+  else if (input.loadLimitT < BRIDGE_LOAD_LIMIT_MIN)
+    errs.push(`限载值不能小于 ${BRIDGE_LOAD_LIMIT_MIN}t`)
+  else if (input.loadLimitT > BRIDGE_LOAD_LIMIT_MAX)
+    errs.push(`限载值不能大于 ${BRIDGE_LOAD_LIMIT_MAX}t`)
+  if (
+    input.deckWidthM === undefined ||
+    input.deckWidthM === null ||
+    isNaN(input.deckWidthM)
+  )
+    errs.push('桥面宽度不能为空')
+  else if (input.deckWidthM < BRIDGE_DECK_WIDTH_MIN)
+    errs.push(`桥面宽度不能小于 ${BRIDGE_DECK_WIDTH_MIN}m`)
+  else if (input.deckWidthM > BRIDGE_DECK_WIDTH_MAX)
+    errs.push(`桥面宽度不能大于 ${BRIDGE_DECK_WIDTH_MAX}m`)
+  if (
+    input.bridgeLengthM === undefined ||
+    input.bridgeLengthM === null ||
+    isNaN(input.bridgeLengthM)
+  )
+    errs.push('桥梁长度不能为空')
+  else if (input.bridgeLengthM < BRIDGE_LENGTH_MIN)
+    errs.push(`桥梁长度不能小于 ${BRIDGE_LENGTH_MIN}m`)
+  else if (input.bridgeLengthM > BRIDGE_LENGTH_MAX)
+    errs.push(`桥梁长度不能大于 ${BRIDGE_LENGTH_MAX}m`)
+  if (errs.length > 0) return { error: errs.join('; ') }
+
+  const routeExists = SURVEY_ROUTES.some((r) => r.id === input.routeId)
+  if (!routeExists) return { error: `路线 "${input.routeId}" 不存在` }
+  const route = SURVEY_ROUTES.find((r) => r.id === input.routeId)
+  const obsExists = route?.obstacles.some((o) => o.id === input.obstacleId)
+  if (!obsExists)
+    return {
+      error: `障碍 "${input.obstacleId}" 不属于路线 "${input.routeId}"`,
+    }
+  const obs = route?.obstacles.find((o) => o.id === input.obstacleId)
+  if (obs && obs.type !== 'bridge')
+    return {
+      error: `障碍 "${input.obstacleId}" 不是桥梁类型，不能提交桥梁信息`,
+    }
+
+  const ld = Math.round(input.loadLimitT * 100) / 100
+  const dw = Math.round(input.deckWidthM * 100) / 100
+  const bl = Math.round(input.bridgeLengthM * 100) / 100
+  const srcLabel = BRIDGE_PARAMETER_SOURCE_LABELS[input.source] ?? input.source
+
+  return {
+    id: `bridge-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    routeId: input.routeId,
+    obstacleId: input.obstacleId,
+    targetId: input.targetId,
+    targetLabel: input.targetLabel,
+    toolType: 'bridge',
+    bridgeName: input.bridgeName,
+    bridgeKind: input.bridgeKind,
+    loadLimitT: ld,
+    deckWidthM: dw,
+    bridgeLengthM: bl,
+    clearanceHeightM: input.clearanceHeightM
+      ? Math.round(input.clearanceHeightM * 100) / 100
+      : undefined,
+    laneCount: input.laneCount,
+    deckCondition: input.deckCondition,
+    allowMeeting: input.allowMeeting,
+    source: input.source,
+    valueLabel: `${input.bridgeName} 限载${ld}t 桥宽${dw}m 桥长${bl}m 来源:${srcLabel}`,
+    measuredAt: new Date().toISOString(),
+    notes: input.notes,
+  }
+}
+
+export function validateBridgeInfoMeasurementResult(
+  result: unknown,
+): MeasurementValidationResult {
+  const errors: string[] = []
+  const parsed = bridgeInfoMeasurementResultSchema.safeParse(result)
+  if (!parsed.success) {
+    for (const issue of parsed.error.issues) {
+      const path = issue.path.length > 0 ? issue.path.join('.') + ': ' : ''
+      errors.push(path + issue.message)
+    }
+    return { success: false, errors }
+  }
+
+  const data = parsed.data
+  const routeExists = SURVEY_ROUTES.some((r) => r.id === data.routeId)
+  if (!routeExists) {
+    errors.push(`路线 "${data.routeId}" 不存在`)
+  } else {
+    const route = SURVEY_ROUTES.find((r) => r.id === data.routeId)
+    const obsExists = route?.obstacles.some((o) => o.id === data.obstacleId)
+    if (!obsExists) {
+      errors.push(`障碍 "${data.obstacleId}" 不属于路线 "${data.routeId}"`)
+    } else {
+      const obs = route?.obstacles.find((o) => o.id === data.obstacleId)
+      if (obs && obs.type !== 'bridge') {
+        errors.push(`障碍 "${data.obstacleId}" 不是桥梁类型，不能提交桥梁信息`)
+      }
+    }
+  }
+
+  return { success: errors.length === 0, errors }
+}
+
+export function formatBridgeInfoSummary(
+  result: BridgeInfoMeasurementResult,
+): string {
+  const kindLabel = BRIDGE_KIND_LABELS[result.bridgeKind] ?? result.bridgeKind
+  const srcLabel =
+    BRIDGE_PARAMETER_SOURCE_LABELS[result.source] ?? result.source
+  const lines = [
+    `桥梁名称：${result.bridgeName}`,
+    `桥梁类型：${kindLabel}`,
+    `限载值：${result.loadLimitT} t`,
+    `桥面宽度：${result.deckWidthM} m`,
+    `桥梁长度：${result.bridgeLengthM} m`,
+  ]
+  if (result.clearanceHeightM !== undefined)
+    lines.push(`桥下净空：${result.clearanceHeightM} m`)
+  if (result.laneCount !== undefined) lines.push(`车道数：${result.laneCount}`)
+  if (result.deckCondition !== undefined)
+    lines.push(
+      `桥面状况：${BRIDGE_DECK_CONDITION_LABELS[result.deckCondition] ?? result.deckCondition}`,
+    )
+  if (result.allowMeeting !== undefined)
+    lines.push(`允许会车：${result.allowMeeting ? '是' : '否'}`)
+  lines.push(`参数来源：${srcLabel}`)
+  lines.push(`测量时间：${result.measuredAt}`)
+  if (result.notes) lines.push(`备注：${result.notes}`)
+  return lines.join('\n')
 }

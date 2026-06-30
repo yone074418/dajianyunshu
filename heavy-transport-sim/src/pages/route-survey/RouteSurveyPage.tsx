@@ -13,6 +13,19 @@ import {
   calculateVerticalDistance,
   calculateSlopePercent,
   calculateSlopeAngleDeg,
+  BRIDGE_KIND_LABELS,
+  BRIDGE_PARAMETER_SOURCE_LABELS,
+  BRIDGE_LOAD_LIMIT_MIN,
+  BRIDGE_LOAD_LIMIT_MAX,
+  BRIDGE_DECK_WIDTH_MIN,
+  BRIDGE_DECK_WIDTH_MAX,
+  BRIDGE_LENGTH_MIN,
+  BRIDGE_LENGTH_MAX,
+  createBridgeInfoMeasurementResult,
+  type BridgeKind,
+  type BridgeParameterSource,
+  type BridgeDeckCondition,
+  type BridgeInfoMeasurementResult,
 } from '../../domain/measurements'
 import { useRouteSurveyStore } from '../../stores/route-survey/routeSurveyStore'
 
@@ -187,9 +200,10 @@ export default function RouteSurveyPage() {
 
       <div style={teachingNoteStyle}>
         <strong>教学简化声明：</strong>
-        本路线和障碍点数据为教学简化配置，不代表真实工程路线。 Day59
-        已实现距离/高度测量工具，Day60 已实现坡度测量。弯道、桥梁测量将在
-        Day61—Day62 实现。
+        本路线和障碍点数据为教学简化配置，不代表真实工程路线。Day59
+        已实现距离/高度测量工具，Day60 已实现坡度测量，Day62
+        已实现桥梁信息查看和限载输入。 桥梁承载教学规则由 Day68
+        实现。本系统不做桥梁是否能通行的最终判断。
       </div>
     </div>
   )
@@ -433,6 +447,23 @@ const teachingNoteStyle: React.CSSProperties = {
   fontSize: '12px',
 }
 
+const formLabelStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2px',
+  fontSize: '12px',
+  fontWeight: 500,
+  color: '#333',
+}
+
+const formInputStyle: React.CSSProperties = {
+  padding: '6px 8px',
+  border: '1px solid #d0d7de',
+  borderRadius: '4px',
+  fontSize: '13px',
+  marginTop: '2px',
+}
+
 function MeasurementPanel({
   routeId,
   obstacle,
@@ -460,12 +491,59 @@ function MeasurementPanel({
     slopeAngle?: number
   } | null>(null)
 
+  const [bridgeResult, setBridgeResult] =
+    useState<BridgeInfoMeasurementResult | null>(null)
+  const [bridgeForm, setBridgeForm] = useState<{
+    bridgeKind: BridgeKind
+    loadLimitT: string
+    deckWidthM: string
+    bridgeLengthM: string
+    clearanceHeightM: string
+    laneCount: string
+    deckCondition: BridgeDeckCondition
+    allowMeeting: boolean
+    source: BridgeParameterSource
+    notes: string
+  }>({
+    bridgeKind: 'medium_bridge',
+    loadLimitT: '',
+    deckWidthM: '',
+    bridgeLengthM: '',
+    clearanceHeightM: '',
+    laneCount: '',
+    deckCondition: 'unknown',
+    allowMeeting: false,
+    source: 'manual_input',
+    notes: '',
+  })
+  const [bridgeErrors, setBridgeErrors] = useState<string[]>([])
+
   const activeTarget = targets.find((t) => t.id === activeTargetId) ?? null
 
   const handleTargetSelect = (targetId: string) => {
     setActiveTargetId(targetId)
     setSelectedPairIndex(null)
     setMeasurementResult(null)
+    setBridgeResult(null)
+    setBridgeErrors([])
+    const tgt = targets.find((t) => t.id === targetId)
+    if (tgt?.bridgeKind) {
+      const preset = tgt.presetBridgeParams
+      setBridgeForm({
+        bridgeKind: tgt.bridgeKind,
+        loadLimitT: preset?.loadLimitT ? String(preset.loadLimitT) : '',
+        deckWidthM: preset?.deckWidthM ? String(preset.deckWidthM) : '',
+        bridgeLengthM: preset?.bridgeLengthM
+          ? String(preset.bridgeLengthM)
+          : '',
+        clearanceHeightM: '',
+        laneCount: '',
+        deckCondition: 'unknown',
+        allowMeeting: false,
+        source: preset?.loadLimitT ? 'teaching_config' : 'manual_input',
+        notes: '',
+      })
+    }
   }
 
   const handlePresetSelect = (pairIndex: number) => {
@@ -541,6 +619,79 @@ function MeasurementPanel({
     setActiveTargetId(null)
     setSelectedPairIndex(null)
     setMeasurementResult(null)
+    setBridgeResult(null)
+    setBridgeErrors([])
+  }
+
+  const handleBridgeSave = () => {
+    if (!activeTarget) return
+    const errs: string[] = []
+    const loadLimit = parseFloat(bridgeForm.loadLimitT)
+    const deckWidth = parseFloat(bridgeForm.deckWidthM)
+    const bridgeLength = parseFloat(bridgeForm.bridgeLengthM)
+    if (isNaN(loadLimit) || loadLimit <= 0)
+      errs.push(
+        `限载值必须在 ${BRIDGE_LOAD_LIMIT_MIN}t 到 ${BRIDGE_LOAD_LIMIT_MAX}t 之间`,
+      )
+    else if (loadLimit < BRIDGE_LOAD_LIMIT_MIN)
+      errs.push(`限载值不能小于 ${BRIDGE_LOAD_LIMIT_MIN}t`)
+    else if (loadLimit > BRIDGE_LOAD_LIMIT_MAX)
+      errs.push(`限载值不能大于 ${BRIDGE_LOAD_LIMIT_MAX}t`)
+    if (isNaN(deckWidth) || deckWidth <= 0)
+      errs.push(
+        `桥面宽度必须在 ${BRIDGE_DECK_WIDTH_MIN}m 到 ${BRIDGE_DECK_WIDTH_MAX}m 之间`,
+      )
+    else if (deckWidth < BRIDGE_DECK_WIDTH_MIN)
+      errs.push(`桥面宽度不能小于 ${BRIDGE_DECK_WIDTH_MIN}m`)
+    else if (deckWidth > BRIDGE_DECK_WIDTH_MAX)
+      errs.push(`桥面宽度不能大于 ${BRIDGE_DECK_WIDTH_MAX}m`)
+    if (isNaN(bridgeLength) || bridgeLength <= 0)
+      errs.push(
+        `桥梁长度必须在 ${BRIDGE_LENGTH_MIN}m 到 ${BRIDGE_LENGTH_MAX}m 之间`,
+      )
+    else if (bridgeLength < BRIDGE_LENGTH_MIN)
+      errs.push(`桥梁长度不能小于 ${BRIDGE_LENGTH_MIN}m`)
+    else if (bridgeLength > BRIDGE_LENGTH_MAX)
+      errs.push(`桥梁长度不能大于 ${BRIDGE_LENGTH_MAX}m`)
+    if (errs.length > 0) {
+      setBridgeErrors(errs)
+      return
+    }
+    setBridgeErrors([])
+    const result = createBridgeInfoMeasurementResult({
+      routeId,
+      obstacleId: obstacle.id,
+      targetId: activeTarget.id,
+      targetLabel: activeTarget.label,
+      bridgeName: obstacle.name,
+      bridgeKind: bridgeForm.bridgeKind,
+      loadLimitT: loadLimit,
+      deckWidthM: deckWidth,
+      bridgeLengthM: bridgeLength,
+      clearanceHeightM: bridgeForm.clearanceHeightM
+        ? parseFloat(bridgeForm.clearanceHeightM)
+        : undefined,
+      laneCount: bridgeForm.laneCount
+        ? parseInt(bridgeForm.laneCount)
+        : undefined,
+      deckCondition: bridgeForm.deckCondition,
+      allowMeeting: bridgeForm.allowMeeting,
+      source: bridgeForm.source,
+      notes: bridgeForm.notes || undefined,
+    })
+    if ('error' in result) {
+      setBridgeErrors([result.error])
+      return
+    }
+    setBridgeResult(result)
+    useRouteSurveyStore.getState().upsertMeasurementDraft({
+      routeId,
+      obstacleId: obstacle.id,
+      measurementType: 'bridge',
+      status: 'measured',
+      valueSummary: result.valueLabel,
+      updatedAt: result.measuredAt,
+    })
   }
 
   if (targets.length === 0) {
@@ -600,7 +751,24 @@ function MeasurementPanel({
           <div style={{ fontSize: '13px', color: '#555' }}>
             {activeTarget.description}
           </div>
-          {activeTarget.suggestedPointPairs &&
+          {activeTarget.supportedTools.includes('bridge') &&
+          activeTarget.bridgeKind ? (
+            <div style={{ marginTop: '12px' }}>
+              <BridgeInfoForm
+                obstacle={obstacle}
+                form={bridgeForm}
+                onChange={setBridgeForm}
+                errors={bridgeErrors}
+                onSave={handleBridgeSave}
+                result={bridgeResult}
+                onClear={() => {
+                  setBridgeResult(null)
+                  setBridgeErrors([])
+                }}
+              />
+            </div>
+          ) : (
+            activeTarget.suggestedPointPairs &&
             activeTarget.suggestedPointPairs.length > 0 && (
               <div style={{ marginTop: '8px' }}>
                 <strong style={{ fontSize: '12px' }}>预设测量点：</strong>
@@ -635,7 +803,8 @@ function MeasurementPanel({
                   ))}
                 </div>
               </div>
-            )}
+            )
+          )}
         </div>
       )}
 
@@ -735,6 +904,335 @@ function MeasurementPanel({
         >
           清除测量
         </button>
+      )}
+    </div>
+  )
+}
+
+function BridgeInfoForm({
+  obstacle,
+  form,
+  onChange,
+  errors,
+  onSave,
+  result,
+  onClear,
+}: {
+  obstacle: RouteObstacle
+  form: {
+    bridgeKind: BridgeKind
+    loadLimitT: string
+    deckWidthM: string
+    bridgeLengthM: string
+    clearanceHeightM: string
+    laneCount: string
+    deckCondition: BridgeDeckCondition
+    allowMeeting: boolean
+    source: BridgeParameterSource
+    notes: string
+  }
+  onChange: (f: typeof form) => void
+  errors: string[]
+  onSave: () => void
+  result: BridgeInfoMeasurementResult | null
+  onClear: () => void
+}) {
+  return (
+    <div data-testid="bridge-info-form">
+      <div
+        data-testid="bridge-info-card"
+        style={{
+          padding: '12px',
+          background: '#f5f5f5',
+          borderRadius: '6px',
+          marginBottom: '12px',
+        }}
+      >
+        <div
+          style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}
+        >
+          {obstacle.name}
+        </div>
+        <div style={{ fontSize: '13px', color: '#333' }}>
+          {obstacle.description}
+        </div>
+        <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+          类型：{ROUTE_OBSTACLE_TYPE_LABELS[obstacle.type] ?? obstacle.type} |
+          风险：
+          {obstacle.riskLevel === 'high'
+            ? '高'
+            : obstacle.riskLevel === 'medium'
+              ? '中'
+              : '低'}
+        </div>
+        <div
+          style={{
+            fontSize: '12px',
+            color: '#1565c0',
+            marginTop: '4px',
+            fontStyle: 'italic',
+          }}
+        >
+          {obstacle.teachingNote}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '8px' }}>
+        <strong style={{ fontSize: '12px' }}>桥梁类型：</strong>
+        <span
+          data-testid="bridge-kind"
+          style={{ fontSize: '13px', marginLeft: '4px' }}
+        >
+          {BRIDGE_KIND_LABELS[form.bridgeKind] ?? form.bridgeKind}
+        </span>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '8px',
+          marginBottom: '8px',
+        }}
+      >
+        <label style={formLabelStyle}>
+          <span>限载值 (t) *</span>
+          <input
+            data-testid="bridge-load-limit-input"
+            type="number"
+            step="1"
+            min={BRIDGE_LOAD_LIMIT_MIN}
+            max={BRIDGE_LOAD_LIMIT_MAX}
+            value={form.loadLimitT}
+            onChange={(e) => onChange({ ...form, loadLimitT: e.target.value })}
+            style={formInputStyle}
+            placeholder={`${BRIDGE_LOAD_LIMIT_MIN}-${BRIDGE_LOAD_LIMIT_MAX}t`}
+          />
+          <span style={{ fontSize: '11px', color: '#999' }}>
+            范围：{BRIDGE_LOAD_LIMIT_MIN}t - {BRIDGE_LOAD_LIMIT_MAX}t
+          </span>
+        </label>
+        <label style={formLabelStyle}>
+          <span>桥面宽度 (m) *</span>
+          <input
+            data-testid="bridge-deck-width-input"
+            type="number"
+            step="0.1"
+            min={BRIDGE_DECK_WIDTH_MIN}
+            max={BRIDGE_DECK_WIDTH_MAX}
+            value={form.deckWidthM}
+            onChange={(e) => onChange({ ...form, deckWidthM: e.target.value })}
+            style={formInputStyle}
+            placeholder={`${BRIDGE_DECK_WIDTH_MIN}-${BRIDGE_DECK_WIDTH_MAX}m`}
+          />
+          <span style={{ fontSize: '11px', color: '#999' }}>
+            范围：{BRIDGE_DECK_WIDTH_MIN}m - {BRIDGE_DECK_WIDTH_MAX}m
+          </span>
+        </label>
+        <label style={formLabelStyle}>
+          <span>桥梁长度 (m) *</span>
+          <input
+            data-testid="bridge-length-input"
+            type="number"
+            step="1"
+            min={BRIDGE_LENGTH_MIN}
+            max={BRIDGE_LENGTH_MAX}
+            value={form.bridgeLengthM}
+            onChange={(e) =>
+              onChange({ ...form, bridgeLengthM: e.target.value })
+            }
+            style={formInputStyle}
+            placeholder={`${BRIDGE_LENGTH_MIN}-${BRIDGE_LENGTH_MAX}m`}
+          />
+          <span style={{ fontSize: '11px', color: '#999' }}>
+            范围：{BRIDGE_LENGTH_MIN}m - {BRIDGE_LENGTH_MAX}m
+          </span>
+        </label>
+        <label style={formLabelStyle}>
+          <span>桥下净空 (m)</span>
+          <input
+            data-testid="bridge-clearance-input"
+            type="number"
+            step="0.1"
+            min="0"
+            value={form.clearanceHeightM}
+            onChange={(e) =>
+              onChange({ ...form, clearanceHeightM: e.target.value })
+            }
+            style={formInputStyle}
+            placeholder="可选"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>车道数</span>
+          <input
+            data-testid="bridge-lane-count-input"
+            type="number"
+            step="1"
+            min="1"
+            max="8"
+            value={form.laneCount}
+            onChange={(e) => onChange({ ...form, laneCount: e.target.value })}
+            style={formInputStyle}
+            placeholder="可选"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>参数来源</span>
+          <select
+            data-testid="bridge-source-select"
+            value={form.source}
+            onChange={(e) =>
+              onChange({
+                ...form,
+                source: e.target.value as BridgeParameterSource,
+              })
+            }
+            style={formInputStyle}
+          >
+            <option value="manual_input">手动录入</option>
+            <option value="field_sign">现场标牌</option>
+            <option value="survey_document">资料查询</option>
+            <option value="teacher_provided">教师给定</option>
+            <option value="teaching_config">教学配置</option>
+          </select>
+        </label>
+      </div>
+
+      <label
+        style={{ ...formLabelStyle, marginBottom: '8px', display: 'block' }}
+      >
+        <span>备注</span>
+        <textarea
+          data-testid="bridge-notes-input"
+          value={form.notes}
+          onChange={(e) => onChange({ ...form, notes: e.target.value })}
+          style={{
+            ...formInputStyle,
+            width: '100%',
+            minHeight: '48px',
+            resize: 'vertical',
+          }}
+          placeholder="可选备注"
+        />
+      </label>
+
+      {errors.length > 0 && (
+        <div
+          data-testid="bridge-errors"
+          style={{
+            padding: '8px',
+            background: '#ffebee',
+            borderRadius: '4px',
+            fontSize: '12px',
+            color: '#c62828',
+            marginTop: '8px',
+          }}
+        >
+          {errors.map((e, i) => (
+            <div key={i}>{e}</div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+        <button
+          data-testid="btn-save-bridge"
+          onClick={onSave}
+          style={{
+            padding: '6px 16px',
+            border: '1px solid #1976d2',
+            borderRadius: '4px',
+            background: '#1976d2',
+            color: '#fff',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: 'bold',
+          }}
+        >
+          保存桥梁信息
+        </button>
+        {result && (
+          <button
+            data-testid="btn-clear-bridge"
+            onClick={onClear}
+            style={{
+              padding: '6px 16px',
+              border: '1px solid #d0d7de',
+              borderRadius: '4px',
+              background: '#fff',
+              cursor: 'pointer',
+              fontSize: '12px',
+            }}
+          >
+            重填
+          </button>
+        )}
+      </div>
+
+      {result && (
+        <div
+          data-testid="bridge-result"
+          style={{
+            padding: '12px',
+            background: '#e8f5e9',
+            borderRadius: '6px',
+            marginTop: '12px',
+          }}
+        >
+          <div
+            style={{
+              fontWeight: 'bold',
+              fontSize: '14px',
+              marginBottom: '4px',
+            }}
+          >
+            桥梁信息保存结果
+          </div>
+          <div data-testid="bridge-result-name" style={{ fontSize: '13px' }}>
+            桥梁名称：{result.bridgeName}
+          </div>
+          <div data-testid="bridge-result-kind" style={{ fontSize: '13px' }}>
+            桥梁类型：
+            {BRIDGE_KIND_LABELS[result.bridgeKind] ?? result.bridgeKind}
+          </div>
+          <div
+            data-testid="bridge-result-load-limit"
+            style={{ fontSize: '13px' }}
+          >
+            限载值：{result.loadLimitT} t
+          </div>
+          <div
+            data-testid="bridge-result-deck-width"
+            style={{ fontSize: '13px' }}
+          >
+            桥面宽度：{result.deckWidthM} m
+          </div>
+          <div data-testid="bridge-result-length" style={{ fontSize: '13px' }}>
+            桥梁长度：{result.bridgeLengthM} m
+          </div>
+          {result.clearanceHeightM !== undefined && (
+            <div
+              data-testid="bridge-result-clearance"
+              style={{ fontSize: '13px' }}
+            >
+              桥下净空：{result.clearanceHeightM} m
+            </div>
+          )}
+          <div
+            data-testid="bridge-result-source"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            参数来源：
+            {BRIDGE_PARAMETER_SOURCE_LABELS[result.source] ?? result.source}
+          </div>
+          <div
+            data-testid="bridge-result-object"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            测量对象：{result.targetLabel}
+          </div>
+        </div>
       )}
     </div>
   )

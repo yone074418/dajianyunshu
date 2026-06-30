@@ -16,8 +16,13 @@ import {
   calculateSlopeAngleDeg,
   createSlopeMeasurementResult,
   validateSlopeMeasurementResult,
+  bridgeInfoMeasurementResultSchema,
+  createBridgeInfoMeasurementResult,
+  validateBridgeInfoMeasurementResult,
+  formatBridgeInfoSummary,
   type MeasurementPoint,
   type MeasurementTarget,
+  type BridgeInfoMeasurementResult,
 } from './measurements'
 import { SURVEY_ROUTES } from './surveyRouteData'
 
@@ -343,13 +348,17 @@ describe('getMeasurementTargetsForObstacle', () => {
     expect(targets[0].supportedTools).toContain('height')
   })
 
-  it('each target has suggestedPointPairs', () => {
+  it('each target has suggestedPointPairs or is a bridge_info target', () => {
     for (const route of SURVEY_ROUTES) {
       for (const obs of route.obstacles) {
         const targets = getMeasurementTargetsForObstacle(route.id, obs)
         for (const t of targets) {
-          expect(t.suggestedPointPairs).toBeDefined()
-          expect(t.suggestedPointPairs!.length).toBeGreaterThanOrEqual(1)
+          if (t.supportedTools.includes('bridge')) {
+            expect(t.bridgeKind).toBeDefined()
+          } else {
+            expect(t.suggestedPointPairs).toBeDefined()
+            expect(t.suggestedPointPairs!.length).toBeGreaterThanOrEqual(1)
+          }
         }
       }
     }
@@ -600,5 +609,271 @@ describe('Slope targets for slope obstacles', () => {
       t.supportedTools.includes('height'),
     )
     expect(heightTarget).toBeDefined()
+  })
+})
+
+describe('Bridge info measurement schema', () => {
+  it('can be imported', () => {
+    expect(bridgeInfoMeasurementResultSchema).toBeDefined()
+  })
+
+  it('valid bridge result passes schema', () => {
+    const r = {
+      id: 'bridge-1',
+      routeId: 'route_b_industrial_direct',
+      obstacleId: 'obs_b1_canal_bridge',
+      targetId: 'target_bridge',
+      targetLabel: '运河公路桥梁 - 桥梁信息',
+      toolType: 'bridge' as const,
+      bridgeName: '运河公路桥梁',
+      bridgeKind: 'medium_bridge' as const,
+      loadLimitT: 200,
+      deckWidthM: 8,
+      bridgeLengthM: 50,
+      source: 'manual_input' as const,
+      valueLabel: 'test',
+      measuredAt: new Date().toISOString(),
+    }
+    expect(bridgeInfoMeasurementResultSchema.safeParse(r).success).toBe(true)
+  })
+})
+
+describe('createBridgeInfoMeasurementResult', () => {
+  const baseInput = {
+    routeId: 'route_b_industrial_direct',
+    obstacleId: 'obs_b1_canal_bridge',
+    targetId: 'target_bridge',
+    targetLabel: '运河公路桥梁 - 桥梁信息',
+    bridgeName: '运河公路桥梁',
+    bridgeKind: 'medium_bridge' as const,
+    source: 'manual_input' as const,
+  }
+
+  it('creates valid bridge result', () => {
+    const r = createBridgeInfoMeasurementResult({
+      ...baseInput,
+      loadLimitT: 200,
+      deckWidthM: 8,
+      bridgeLengthM: 50,
+    })
+    expect('error' in r).toBe(false)
+    if (!('error' in r)) {
+      expect(r.toolType).toBe('bridge')
+      expect(r.bridgeName).toBe('运河公路桥梁')
+      expect(r.loadLimitT).toBe(200)
+      expect(r.deckWidthM).toBe(8)
+      expect(r.bridgeLengthM).toBe(50)
+      expect(r.source).toBe('manual_input')
+    }
+  })
+
+  it('returns error for loadLimitT below minimum', () => {
+    const r = createBridgeInfoMeasurementResult({
+      ...baseInput,
+      loadLimitT: 3,
+      deckWidthM: 8,
+      bridgeLengthM: 50,
+    })
+    expect('error' in r).toBe(true)
+    if ('error' in r) expect(r.error).toContain('限载值')
+  })
+
+  it('returns error for loadLimitT above maximum', () => {
+    const r = createBridgeInfoMeasurementResult({
+      ...baseInput,
+      loadLimitT: 600,
+      deckWidthM: 8,
+      bridgeLengthM: 50,
+    })
+    expect('error' in r).toBe(true)
+    if ('error' in r) expect(r.error).toContain('限载值')
+  })
+
+  it('returns error for loadLimitT = 0', () => {
+    const r = createBridgeInfoMeasurementResult({
+      ...baseInput,
+      loadLimitT: 0,
+      deckWidthM: 8,
+      bridgeLengthM: 50,
+    })
+    expect('error' in r).toBe(true)
+  })
+
+  it('returns error for negative loadLimitT', () => {
+    const r = createBridgeInfoMeasurementResult({
+      ...baseInput,
+      loadLimitT: -10,
+      deckWidthM: 8,
+      bridgeLengthM: 50,
+    })
+    expect('error' in r).toBe(true)
+  })
+
+  it('returns error for deckWidthM out of range', () => {
+    const r = createBridgeInfoMeasurementResult({
+      ...baseInput,
+      loadLimitT: 200,
+      deckWidthM: 1,
+      bridgeLengthM: 50,
+    })
+    expect('error' in r).toBe(true)
+    if ('error' in r) expect(r.error).toContain('桥面宽度')
+  })
+
+  it('returns error for bridgeLengthM out of range', () => {
+    const r = createBridgeInfoMeasurementResult({
+      ...baseInput,
+      loadLimitT: 200,
+      deckWidthM: 8,
+      bridgeLengthM: 2,
+    })
+    expect('error' in r).toBe(true)
+    if ('error' in r) expect(r.error).toContain('桥梁长度')
+  })
+
+  it('returns error for missing routeId', () => {
+    const r = createBridgeInfoMeasurementResult({
+      ...baseInput,
+      routeId: '',
+      loadLimitT: 200,
+      deckWidthM: 8,
+      bridgeLengthM: 50,
+    })
+    expect('error' in r).toBe(true)
+  })
+
+  it('returns error for nonexistent route', () => {
+    const r = createBridgeInfoMeasurementResult({
+      ...baseInput,
+      routeId: 'nonexistent',
+      loadLimitT: 200,
+      deckWidthM: 8,
+      bridgeLengthM: 50,
+    })
+    expect('error' in r).toBe(true)
+    if ('error' in r) expect(r.error).toContain('不存在')
+  })
+
+  it('returns error for non-bridge obstacle', () => {
+    const r = createBridgeInfoMeasurementResult({
+      ...baseInput,
+      obstacleId: 'obs_b2_construction_narrow',
+      loadLimitT: 200,
+      deckWidthM: 8,
+      bridgeLengthM: 50,
+    })
+    expect('error' in r).toBe(true)
+    if ('error' in r) expect(r.error).toContain('不是桥梁类型')
+  })
+})
+
+describe('validateBridgeInfoMeasurementResult', () => {
+  const validResult: BridgeInfoMeasurementResult = {
+    id: 'bridge-1',
+    routeId: 'route_b_industrial_direct',
+    obstacleId: 'obs_b1_canal_bridge',
+    targetId: 'target_bridge',
+    targetLabel: '运河公路桥梁 - 桥梁信息',
+    toolType: 'bridge',
+    bridgeName: '运河公路桥梁',
+    bridgeKind: 'medium_bridge',
+    loadLimitT: 200,
+    deckWidthM: 8,
+    bridgeLengthM: 50,
+    source: 'manual_input',
+    valueLabel: 'test',
+    measuredAt: new Date().toISOString(),
+  }
+
+  it('valid result passes validation', () => {
+    const v = validateBridgeInfoMeasurementResult(validResult)
+    expect(v.success).toBe(true)
+    expect(v.errors).toEqual([])
+  })
+
+  it('fails for nonexistent route', () => {
+    const v = validateBridgeInfoMeasurementResult({
+      ...validResult,
+      routeId: 'nonexistent',
+    })
+    expect(v.success).toBe(false)
+  })
+
+  it('fails for non-bridge obstacle', () => {
+    const v = validateBridgeInfoMeasurementResult({
+      ...validResult,
+      obstacleId: 'obs_b2_construction_narrow',
+    })
+    expect(v.success).toBe(false)
+    expect(v.errors.some((e) => e.includes('不是桥梁类型'))).toBe(true)
+  })
+
+  it('fails for null input', () => {
+    const v = validateBridgeInfoMeasurementResult(null)
+    expect(v.success).toBe(false)
+  })
+})
+
+describe('formatBridgeInfoSummary', () => {
+  it('formats summary with all fields', () => {
+    const result: BridgeInfoMeasurementResult = {
+      id: 'bridge-1',
+      routeId: 'route_b_industrial_direct',
+      obstacleId: 'obs_b1_canal_bridge',
+      targetId: 'target_bridge',
+      targetLabel: '运河公路桥梁 - 桥梁信息',
+      toolType: 'bridge',
+      bridgeName: '运河公路桥梁',
+      bridgeKind: 'medium_bridge',
+      loadLimitT: 200,
+      deckWidthM: 8,
+      bridgeLengthM: 50,
+      source: 'field_sign',
+      valueLabel: 'test',
+      measuredAt: '2026-06-30T10:00:00Z',
+      notes: '测试备注',
+    }
+    const summary = formatBridgeInfoSummary(result)
+    expect(summary).toContain('运河公路桥梁')
+    expect(summary).toContain('中型桥梁')
+    expect(summary).toContain('200 t')
+    expect(summary).toContain('8 m')
+    expect(summary).toContain('50 m')
+    expect(summary).toContain('现场标牌')
+    expect(summary).toContain('测试备注')
+  })
+})
+
+describe('Bridge targets for bridge obstacles', () => {
+  it('bridge obstacle has bridge_info target with bridge tool', () => {
+    const obs = SURVEY_ROUTES[1].obstacles.find((o) => o.type === 'bridge')!
+    const targets = getMeasurementTargetsForObstacle(SURVEY_ROUTES[1].id, obs)
+    const bridgeTarget = targets.find((t) =>
+      t.supportedTools.includes('bridge'),
+    )
+    expect(bridgeTarget).toBeDefined()
+    expect(bridgeTarget!.targetType).toBe('bridge_info')
+    expect(bridgeTarget!.bridgeKind).toBeDefined()
+  })
+
+  it('bridge target has presetBridgeParams', () => {
+    const obs = SURVEY_ROUTES[1].obstacles.find((o) => o.type === 'bridge')!
+    const targets = getMeasurementTargetsForObstacle(SURVEY_ROUTES[1].id, obs)
+    const bridgeTarget = targets.find((t) =>
+      t.supportedTools.includes('bridge'),
+    )
+    expect(bridgeTarget).toBeDefined()
+    expect(bridgeTarget!.presetBridgeParams).toBeDefined()
+    expect(bridgeTarget!.presetBridgeParams!.bridgeName).toBe('运河公路桥梁')
+  })
+
+  it('route C bridge obstacle also has bridge target', () => {
+    const obs = SURVEY_ROUTES[2].obstacles.find((o) => o.type === 'bridge')!
+    const targets = getMeasurementTargetsForObstacle(SURVEY_ROUTES[2].id, obs)
+    const bridgeTarget = targets.find((t) =>
+      t.supportedTools.includes('bridge'),
+    )
+    expect(bridgeTarget).toBeDefined()
+    expect(bridgeTarget!.bridgeKind).toBeDefined()
   })
 })
