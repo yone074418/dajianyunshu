@@ -258,10 +258,14 @@ describe('RouteSurveyPage', () => {
   it('bridge info form shows range hints', () => {
     render(<RouteSurveyPage />)
     fireEvent.click(screen.getByTestId(`route-nav-${SURVEY_ROUTES[1].id}`))
-    const bridgeObs = SURVEY_ROUTES[1].obstacles.find((o) => o.type === 'bridge')!
+    const bridgeObs = SURVEY_ROUTES[1].obstacles.find(
+      (o) => o.type === 'bridge',
+    )!
     fireEvent.click(screen.getByTestId(`obstacle-item-${bridgeObs.id}`))
     const targetButtons = screen.getAllByTestId(/^target-/)
-    fireEvent.click(targetButtons.find((b) => b.textContent?.includes('桥梁信息'))!)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('桥梁信息'))!,
+    )
     expect(screen.getAllByText(/范围/).length).toBeGreaterThan(0)
   })
 
