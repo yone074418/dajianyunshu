@@ -222,7 +222,7 @@
 25. curve target has presetCurveParams
 26. route C curve obstacle also has curve target
 
-### RouteSurveyPage.test.tsx 新增测试（20个）
+### RouteSurveyPage.test.tsx 新增测试（26个）
 
 1. shows curve parameter form when curve obstacle selected
 2. curve parameter form shows radius input with unit m
@@ -243,7 +243,13 @@
 17. can retake curve measurement
 18. does not implement Day62 bridge load input form
 19. does not implement curve passability rule engine
-20. displays Day61 scope in teaching note
+20. displays Day61 scope note
+21. shows curve kind description for circular curve
+22. shows fill preset button when preset params exist
+23. fills preset values when preset button clicked
+24. teaching note states Day61 only does curve measurement
+25. teaching note states Day62 does bridge
+26. compound curve shows extension notice
 
 ## 25. 本地验证命令结果
 
@@ -252,9 +258,9 @@
 | `npm ci` | ✅ 成功（349 packages） |
 | `npm run format:check` | ✅ 通过 |
 | `npm run lint` | ✅ 通过（0 errors, 0 warnings） |
-| `npm run test:run` | ✅ 通过（783 tests passed） |
+| `npm run test:run` | ✅ 通过（787 tests passed） |
 | `npm run test:e2e` | ✅ 通过（12 passed） |
-| `npm run build` | ✅ 成功（4.06s） |
+| `npm run build` | ✅ 成功（4.46s） |
 | `git diff --check` | ✅ 无问题 |
 
 ## 26. 是否新增依赖
