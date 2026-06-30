@@ -194,12 +194,11 @@ export default function RouteSurveyPage() {
 
       <div style={teachingNoteStyle}>
         <strong>教学简化声明：</strong>
-        本路线和障碍点数据为教学简化配置，不代表真实工程路线。Day59
-        已实现距离/高度测量工具，Day60 已实现坡度测量，Day61
-        已实现弯道参数测量（半径、夹角、入口/出口宽度）。
-        桥梁信息查看和限载输入将在 Day62 实现。弯道通过性规则（圆弧弯道
-        Day65、直交弯道 Day66）将在后续实现。
-        本系统不做弯道是否可通过的最终判定。
+        本路线和障碍点数据为教学简化配置，不代表真实工程路线。Day61
+        只做弯道参数测量（半径、夹角、入口/出口宽度），不实现弯道是否可通过的最终判定。
+        桥梁信息查看和限载输入由 Day62 实现。圆弧弯道通过性规则由 Day65
+        实现，直交弯道通过性规则由 Day66 实现。
+        本系统不做弯道是否可通过的最终判定，不生成路线最终建议。
       </div>
     </div>
   )
@@ -775,6 +774,7 @@ function MeasurementPanel({
             <div style={{ marginTop: '12px' }}>
               <CurveParameterForm
                 form={curveForm}
+                presetCurveParams={activeTarget.presetCurveParams}
                 onChange={setCurveForm}
                 errors={curveErrors}
                 onSave={handleCurveSave}
@@ -927,6 +927,13 @@ function MeasurementPanel({
   )
 }
 
+const CURVE_KIND_DESCRIPTIONS: Record<CurveObstacleKind, string> = {
+  circular_curve: '圆弧弯道重点测量：半径、夹角、入口宽度、出口宽度。',
+  right_angle_curve:
+    '直交弯道重点测量：夹角、入口宽度、出口宽度、转角处有效宽度。',
+  compound_curve: '复合弯道参数测量：后续扩展，当前仅支持基础参数录入。',
+}
+
 function CurveParameterForm({
   form,
   onChange,
@@ -934,6 +941,7 @@ function CurveParameterForm({
   onSave,
   result,
   onClear,
+  presetCurveParams,
 }: {
   form: {
     curveKind: CurveObstacleKind
@@ -950,7 +958,40 @@ function CurveParameterForm({
   onSave: () => void
   result: CurveParameterMeasurementResult | null
   onClear: () => void
+  presetCurveParams?: {
+    radiusM?: number
+    angleDeg?: number
+    entranceWidthM?: number
+    exitWidthM?: number
+  }
 }) {
+  const hasPreset =
+    presetCurveParams &&
+    (presetCurveParams.radiusM ||
+      presetCurveParams.angleDeg ||
+      presetCurveParams.entranceWidthM ||
+      presetCurveParams.exitWidthM)
+
+  const handleFillPreset = () => {
+    if (!presetCurveParams) return
+    onChange({
+      ...form,
+      radiusM: presetCurveParams.radiusM
+        ? String(presetCurveParams.radiusM)
+        : form.radiusM,
+      angleDeg: presetCurveParams.angleDeg
+        ? String(presetCurveParams.angleDeg)
+        : form.angleDeg,
+      entranceWidthM: presetCurveParams.entranceWidthM
+        ? String(presetCurveParams.entranceWidthM)
+        : form.entranceWidthM,
+      exitWidthM: presetCurveParams.exitWidthM
+        ? String(presetCurveParams.exitWidthM)
+        : form.exitWidthM,
+      source: 'teaching_config',
+    })
+  }
+
   return (
     <div data-testid="curve-parameter-form">
       <div style={{ marginBottom: '8px' }}>
@@ -961,7 +1002,31 @@ function CurveParameterForm({
         >
           {CURVE_OBSTACLE_KIND_LABELS[form.curveKind] ?? form.curveKind}
         </span>
+        <div
+          data-testid="curve-kind-description"
+          style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+        >
+          {CURVE_KIND_DESCRIPTIONS[form.curveKind] ?? ''}
+        </div>
       </div>
+
+      {hasPreset && (
+        <button
+          data-testid="btn-fill-preset-curve"
+          onClick={handleFillPreset}
+          style={{
+            padding: '4px 12px',
+            borderRadius: '4px',
+            border: '1px solid #1976d2',
+            background: '#e3f2fd',
+            cursor: 'pointer',
+            fontSize: '11px',
+            marginBottom: '8px',
+          }}
+        >
+          从教学配置填入
+        </button>
+      )}
 
       <div
         style={{

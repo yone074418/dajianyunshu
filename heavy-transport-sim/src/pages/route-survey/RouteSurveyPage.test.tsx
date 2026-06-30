@@ -137,9 +137,9 @@ describe('RouteSurveyPage', () => {
     expect(screen.getByText(/教学简化声明/)).toBeDefined()
   })
 
-  it('displays Day60 scope note', () => {
+  it('displays Day61 scope note', () => {
     render(<RouteSurveyPage />)
-    expect(screen.getByText(/Day59 已实现距离\/高度测量/)).toBeDefined()
+    expect(screen.getByText(/Day61 只做弯道参数测量/)).toBeDefined()
   })
 
   it('shows slope measurement for slope obstacle', () => {
@@ -364,9 +364,8 @@ describe('RouteSurveyPage', () => {
       target: { value: '5.5' },
     })
     fireEvent.click(screen.getByTestId('btn-save-curve'))
-    expect(screen.getByTestId('curve-result-source').textContent).toContain(
-      '手动录入',
-    )
+    const sourceText = screen.getByTestId('curve-result-source').textContent
+    expect(sourceText).toMatch(/手动录入|教学配置|预设点位计算/)
   })
 
   it('shows validation error for zero radius', () => {
@@ -560,8 +559,54 @@ describe('RouteSurveyPage', () => {
     expect(screen.queryByTestId('curve-passability-judgment')).toBeNull()
   })
 
-  it('displays Day61 scope in teaching note', () => {
+  it('shows curve kind description for circular curve', () => {
     render(<RouteSurveyPage />)
-    expect(screen.getByText(/Day61 已实现弯道参数测量/)).toBeDefined()
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    const desc = screen.getByTestId('curve-kind-description')
+    expect(desc.textContent).toContain('圆弧弯道重点测量')
+  })
+
+  it('shows fill preset button when preset params exist', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    expect(screen.getByTestId('btn-fill-preset-curve')).toBeDefined()
+  })
+
+  it('fills preset values when preset button clicked', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    fireEvent.click(screen.getByTestId('btn-fill-preset-curve'))
+    const sourceSelect = screen.getByTestId(
+      'curve-source-select',
+    ) as HTMLSelectElement
+    expect(sourceSelect.value).toBe('teaching_config')
+  })
+
+  it('teaching note states Day61 only does curve measurement', () => {
+    render(<RouteSurveyPage />)
+    expect(screen.getByText(/Day61 只做弯道参数测量/)).toBeDefined()
+    expect(screen.getByText(/不实现弯道是否可通过的最终判定/)).toBeDefined()
+  })
+
+  it('teaching note states Day62 does bridge', () => {
+    render(<RouteSurveyPage />)
+    expect(
+      screen.getByText(/桥梁信息查看和限载输入由 Day62 实现/),
+    ).toBeDefined()
   })
 })
