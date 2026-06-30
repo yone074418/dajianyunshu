@@ -191,4 +191,76 @@ describe('RouteSurveyPage', () => {
       .getObstacleMeasurementStatus(SURVEY_ROUTES[2].id, slopeObs.id)
     expect(status).toBe('measured')
   })
+
+  it('shows curve parameter form and saves core curve parameters', () => {
+    render(<RouteSurveyPage />)
+    const route = SURVEY_ROUTES.find((r) =>
+      r.obstacles.some((o) => o.type === 'curve'),
+    )!
+    fireEvent.click(screen.getByTestId(`route-nav-${route.id}`))
+    const curveObs = route.obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const curveTarget = screen
+      .getAllByTestId(/^target-/)
+      .find((b) => b.textContent?.includes('curve'))
+
+    expect(curveTarget).toBeDefined()
+    fireEvent.click(curveTarget!)
+    fireEvent.change(screen.getByTestId('curve-radius-input'), {
+      target: { value: '25' },
+    })
+    fireEvent.change(screen.getByTestId('curve-angle-input'), {
+      target: { value: '90' },
+    })
+    fireEvent.change(screen.getByTestId('curve-entrance-input'), {
+      target: { value: '6' },
+    })
+    fireEvent.change(screen.getByTestId('curve-exit-input'), {
+      target: { value: '5.5' },
+    })
+    fireEvent.click(screen.getByTestId('btn-save-curve'))
+
+    expect(screen.getByTestId('curve-result-radius').textContent).toContain(
+      '25',
+    )
+    expect(screen.getByTestId('curve-result-angle').textContent).toContain('90')
+  })
+
+  it('shows bridge info form and rejects invalid optional bridge fields', () => {
+    render(<RouteSurveyPage />)
+    const route = SURVEY_ROUTES.find((r) =>
+      r.obstacles.some((o) => o.type === 'bridge'),
+    )!
+    fireEvent.click(screen.getByTestId(`route-nav-${route.id}`))
+    const bridgeObs = route.obstacles.find((o) => o.type === 'bridge')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${bridgeObs.id}`))
+    const bridgeTarget = screen
+      .getAllByTestId(/^target-/)
+      .find((b) => b.textContent?.includes('bridge'))
+
+    expect(bridgeTarget).toBeDefined()
+    fireEvent.click(bridgeTarget!)
+    fireEvent.change(screen.getByTestId('bridge-load-limit-input'), {
+      target: { value: '200' },
+    })
+    fireEvent.change(screen.getByTestId('bridge-deck-width-input'), {
+      target: { value: '8' },
+    })
+    fireEvent.change(screen.getByTestId('bridge-length-input'), {
+      target: { value: '50' },
+    })
+    fireEvent.change(screen.getByTestId('bridge-clearance-input'), {
+      target: { value: '1' },
+    })
+    fireEvent.change(screen.getByTestId('bridge-lane-count-input'), {
+      target: { value: '9' },
+    })
+    fireEvent.click(screen.getByTestId('btn-save-bridge'))
+
+    expect(screen.getByTestId('bridge-errors').textContent).toContain(
+      '桥下净空',
+    )
+    expect(screen.getByTestId('bridge-errors').textContent).toContain('车道数')
+    expect(screen.queryByTestId('bridge-result')).toBeNull()
+  })
 })

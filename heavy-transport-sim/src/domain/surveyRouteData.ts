@@ -75,10 +75,14 @@ export const SURVEY_ROUTES: SurveyRoute[] = [
         riskLevel: 'medium',
         measurementTool: 'curve',
         measurementPlaceholders: {
-          innerRadius: null,
+          innerRadius: 25,
           outerRadius: null,
           unit: 'm',
           roadWidth: null,
+          curveKind: 'circular_curve',
+          curveAngleDeg: 90,
+          entranceWidth: 6,
+          exitWidth: 5.5,
         },
         teachingNote:
           '环岛弯道需要同时检查内侧不刮擦和外侧不越界。全挂车组合倒车难度高，需要特别注意。',
@@ -169,6 +173,9 @@ export const SURVEY_ROUTES: SurveyRoute[] = [
           unit: 't',
           vehiclePlusCargoWeight: 168,
           bridgeSpan: null,
+          bridgeKind: 'medium_bridge',
+          deckWidth: null,
+          bridgeLength: null,
         },
         teachingNote:
           '桥梁承载能力需要逐桥核实。车货总重168t对桥梁承载是重要考验，必须确认桥梁设计荷载。',
@@ -306,6 +313,9 @@ export const SURVEY_ROUTES: SurveyRoute[] = [
           unit: 't',
           vehiclePlusCargoWeight: 168,
           bridgeSpan: null,
+          bridgeKind: 'small_bridge',
+          deckWidth: null,
+          bridgeLength: null,
         },
         teachingNote:
           '山区桥梁承载能力通常低于城市桥梁，需要特别关注。同时桥面宽度可能受限。',
@@ -322,10 +332,14 @@ export const SURVEY_ROUTES: SurveyRoute[] = [
         riskLevel: 'medium',
         measurementTool: 'curve',
         measurementPlaceholders: {
-          innerRadius: null,
+          innerRadius: 18,
           outerRadius: null,
           unit: 'm',
           roadWidth: null,
+          curveKind: 'circular_curve',
+          curveAngleDeg: 120,
+          entranceWidth: 5,
+          exitWidth: 4.5,
         },
         teachingNote:
           '下坡弯道对车辆制动和转向同时提出要求。需要综合考虑坡度和弯道半径。',

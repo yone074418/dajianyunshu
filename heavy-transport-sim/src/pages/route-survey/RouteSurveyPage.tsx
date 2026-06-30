@@ -13,6 +13,25 @@ import {
   calculateVerticalDistance,
   calculateSlopePercent,
   calculateSlopeAngleDeg,
+  CURVE_OBSTACLE_KIND_LABELS,
+  CURVE_MEASUREMENT_SOURCE_LABELS,
+  createCurveParameterResult,
+  BRIDGE_KIND_LABELS,
+  BRIDGE_PARAMETER_SOURCE_LABELS,
+  BRIDGE_LOAD_LIMIT_MIN,
+  BRIDGE_LOAD_LIMIT_MAX,
+  BRIDGE_DECK_WIDTH_MIN,
+  BRIDGE_DECK_WIDTH_MAX,
+  BRIDGE_LENGTH_MIN,
+  BRIDGE_LENGTH_MAX,
+  createBridgeInfoMeasurementResult,
+  type CurveObstacleKind,
+  type CurveMeasurementSource,
+  type CurveParameterMeasurementResult,
+  type BridgeKind,
+  type BridgeParameterSource,
+  type BridgeDeckCondition,
+  type BridgeInfoMeasurementResult,
 } from '../../domain/measurements'
 import { useRouteSurveyStore } from '../../stores/route-survey/routeSurveyStore'
 
@@ -187,9 +206,10 @@ export default function RouteSurveyPage() {
 
       <div style={teachingNoteStyle}>
         <strong>教学简化声明：</strong>
-        本路线和障碍点数据为教学简化配置，不代表真实工程路线。 Day59
-        已实现距离/高度测量工具，Day60 已实现坡度测量。弯道、桥梁测量将在
-        Day61—Day62 实现。
+        本路线和障碍点数据为教学简化配置，不代表真实工程路线。Day59
+        已实现距离/高度测量工具，Day60 已实现坡度测量，Day62
+        已实现桥梁信息查看和限载输入。 桥梁承载教学规则由 Day68
+        实现。本系统不做桥梁是否能通行的最终判断。
       </div>
     </div>
   )
@@ -433,6 +453,75 @@ const teachingNoteStyle: React.CSSProperties = {
   fontSize: '12px',
 }
 
+const formLabelStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2px',
+  fontSize: '12px',
+  fontWeight: 500,
+  color: '#333',
+}
+
+const formInputStyle: React.CSSProperties = {
+  padding: '6px 8px',
+  border: '1px solid #d0d7de',
+  borderRadius: '4px',
+  fontSize: '13px',
+  marginTop: '2px',
+}
+
+const curveErrorStyle: React.CSSProperties = {
+  padding: '8px',
+  background: '#ffebee',
+  borderRadius: '4px',
+  fontSize: '12px',
+  color: '#c62828',
+  marginTop: '8px',
+}
+
+const saveBtnStyle: React.CSSProperties = {
+  padding: '6px 16px',
+  border: '1px solid #1976d2',
+  borderRadius: '4px',
+  background: '#1976d2',
+  color: '#fff',
+  cursor: 'pointer',
+  fontSize: '12px',
+  fontWeight: 'bold',
+}
+
+const clearBtnStyle: React.CSSProperties = {
+  padding: '6px 16px',
+  border: '1px solid #d0d7de',
+  borderRadius: '4px',
+  background: '#fff',
+  cursor: 'pointer',
+  fontSize: '12px',
+}
+
+const curveResultBoxStyle: React.CSSProperties = {
+  padding: '12px',
+  background: '#e8f5e9',
+  borderRadius: '6px',
+  marginTop: '12px',
+}
+
+const curveParamRowStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  fontSize: '13px',
+  padding: '2px 0',
+}
+
+const curveParamLabelStyle: React.CSSProperties = {
+  color: '#555',
+}
+
+const curveParamValueStyle: React.CSSProperties = {
+  fontWeight: 'bold',
+  color: '#2e7d32',
+}
+
 function MeasurementPanel({
   routeId,
   obstacle,
@@ -460,12 +549,99 @@ function MeasurementPanel({
     slopeAngle?: number
   } | null>(null)
 
+  const [curveResult, setCurveResult] =
+    useState<CurveParameterMeasurementResult | null>(null)
+  const [curveForm, setCurveForm] = useState<{
+    curveKind: CurveObstacleKind
+    radiusM: string
+    angleDeg: string
+    entranceWidthM: string
+    exitWidthM: string
+    effectiveWidthM: string
+    source: CurveMeasurementSource
+    notes: string
+  }>({
+    curveKind: 'circular_curve',
+    radiusM: '',
+    angleDeg: '',
+    entranceWidthM: '',
+    exitWidthM: '',
+    effectiveWidthM: '',
+    source: 'manual_input',
+    notes: '',
+  })
+  const [curveErrors, setCurveErrors] = useState<string[]>([])
+
+  const [bridgeResult, setBridgeResult] =
+    useState<BridgeInfoMeasurementResult | null>(null)
+  const [bridgeForm, setBridgeForm] = useState<{
+    bridgeKind: BridgeKind
+    loadLimitT: string
+    deckWidthM: string
+    bridgeLengthM: string
+    clearanceHeightM: string
+    laneCount: string
+    deckCondition: BridgeDeckCondition
+    allowMeeting: boolean
+    source: BridgeParameterSource
+    notes: string
+  }>({
+    bridgeKind: 'medium_bridge',
+    loadLimitT: '',
+    deckWidthM: '',
+    bridgeLengthM: '',
+    clearanceHeightM: '',
+    laneCount: '',
+    deckCondition: 'unknown',
+    allowMeeting: false,
+    source: 'manual_input',
+    notes: '',
+  })
+  const [bridgeErrors, setBridgeErrors] = useState<string[]>([])
+
   const activeTarget = targets.find((t) => t.id === activeTargetId) ?? null
 
   const handleTargetSelect = (targetId: string) => {
     setActiveTargetId(targetId)
     setSelectedPairIndex(null)
     setMeasurementResult(null)
+    setCurveResult(null)
+    setCurveErrors([])
+    setBridgeResult(null)
+    setBridgeErrors([])
+    const tgt = targets.find((t) => t.id === targetId)
+    if (tgt?.curveKind) {
+      const preset = tgt.presetCurveParams
+      setCurveForm({
+        curveKind: tgt.curveKind,
+        radiusM: preset?.radiusM ? String(preset.radiusM) : '',
+        angleDeg: preset?.angleDeg ? String(preset.angleDeg) : '',
+        entranceWidthM: preset?.entranceWidthM
+          ? String(preset.entranceWidthM)
+          : '',
+        exitWidthM: preset?.exitWidthM ? String(preset.exitWidthM) : '',
+        effectiveWidthM: '',
+        source: preset?.radiusM ? 'teaching_config' : 'manual_input',
+        notes: '',
+      })
+    }
+    if (tgt?.bridgeKind) {
+      const preset = tgt.presetBridgeParams
+      setBridgeForm({
+        bridgeKind: tgt.bridgeKind,
+        loadLimitT: preset?.loadLimitT ? String(preset.loadLimitT) : '',
+        deckWidthM: preset?.deckWidthM ? String(preset.deckWidthM) : '',
+        bridgeLengthM: preset?.bridgeLengthM
+          ? String(preset.bridgeLengthM)
+          : '',
+        clearanceHeightM: '',
+        laneCount: '',
+        deckCondition: 'unknown',
+        allowMeeting: false,
+        source: preset?.loadLimitT ? 'teaching_config' : 'manual_input',
+        notes: '',
+      })
+    }
   }
 
   const handlePresetSelect = (pairIndex: number) => {
@@ -541,6 +717,148 @@ function MeasurementPanel({
     setActiveTargetId(null)
     setSelectedPairIndex(null)
     setMeasurementResult(null)
+    setCurveResult(null)
+    setCurveErrors([])
+    setBridgeResult(null)
+    setBridgeErrors([])
+  }
+
+  const handleCurveSave = () => {
+    if (!activeTarget) return
+    const errs: string[] = []
+    const radius = parseFloat(curveForm.radiusM)
+    const angle = parseFloat(curveForm.angleDeg)
+    const entrance = parseFloat(curveForm.entranceWidthM)
+    const exit = parseFloat(curveForm.exitWidthM)
+    const effective = curveForm.effectiveWidthM
+      ? parseFloat(curveForm.effectiveWidthM)
+      : undefined
+    if (!Number.isFinite(radius) || radius <= 0) errs.push('半径必须大于 0')
+    if (!Number.isFinite(angle) || angle <= 0 || angle > 180)
+      errs.push('夹角必须大于 0 且小于等于 180')
+    if (!Number.isFinite(entrance) || entrance <= 0)
+      errs.push('入口宽度必须大于 0')
+    if (!Number.isFinite(exit) || exit <= 0) errs.push('出口宽度必须大于 0')
+    if (
+      effective !== undefined &&
+      (!Number.isFinite(effective) || effective <= 0)
+    )
+      errs.push('有效宽度必须大于 0')
+    if (errs.length > 0) {
+      setCurveErrors(errs)
+      return
+    }
+    setCurveErrors([])
+    const result = createCurveParameterResult({
+      routeId,
+      obstacleId: obstacle.id,
+      targetId: activeTarget.id,
+      targetLabel: activeTarget.label,
+      curveKind: curveForm.curveKind,
+      radiusM: radius,
+      angleDeg: angle,
+      entranceWidthM: entrance,
+      exitWidthM: exit,
+      effectiveWidthM: effective,
+      source: curveForm.source,
+      notes: curveForm.notes || undefined,
+    })
+    if ('error' in result) {
+      setCurveErrors([result.error])
+      return
+    }
+    setCurveResult(result)
+    useRouteSurveyStore.getState().upsertMeasurementDraft({
+      routeId,
+      obstacleId: obstacle.id,
+      measurementType: 'curve',
+      status: 'measured',
+      valueSummary: result.valueLabel,
+      updatedAt: result.measuredAt,
+    })
+  }
+
+  const handleBridgeSave = () => {
+    if (!activeTarget) return
+    const errs: string[] = []
+    const loadLimit = parseFloat(bridgeForm.loadLimitT)
+    const deckWidth = parseFloat(bridgeForm.deckWidthM)
+    const bridgeLength = parseFloat(bridgeForm.bridgeLengthM)
+    const clearance = bridgeForm.clearanceHeightM
+      ? parseFloat(bridgeForm.clearanceHeightM)
+      : undefined
+    const laneCount = bridgeForm.laneCount
+      ? parseInt(bridgeForm.laneCount)
+      : undefined
+    if (isNaN(loadLimit) || loadLimit <= 0)
+      errs.push(
+        `限载值必须在 ${BRIDGE_LOAD_LIMIT_MIN}t 到 ${BRIDGE_LOAD_LIMIT_MAX}t 之间`,
+      )
+    else if (loadLimit < BRIDGE_LOAD_LIMIT_MIN)
+      errs.push(`限载值不能小于 ${BRIDGE_LOAD_LIMIT_MIN}t`)
+    else if (loadLimit > BRIDGE_LOAD_LIMIT_MAX)
+      errs.push(`限载值不能大于 ${BRIDGE_LOAD_LIMIT_MAX}t`)
+    if (isNaN(deckWidth) || deckWidth <= 0)
+      errs.push(
+        `桥面宽度必须在 ${BRIDGE_DECK_WIDTH_MIN}m 到 ${BRIDGE_DECK_WIDTH_MAX}m 之间`,
+      )
+    else if (deckWidth < BRIDGE_DECK_WIDTH_MIN)
+      errs.push(`桥面宽度不能小于 ${BRIDGE_DECK_WIDTH_MIN}m`)
+    else if (deckWidth > BRIDGE_DECK_WIDTH_MAX)
+      errs.push(`桥面宽度不能大于 ${BRIDGE_DECK_WIDTH_MAX}m`)
+    if (isNaN(bridgeLength) || bridgeLength <= 0)
+      errs.push(
+        `桥梁长度必须在 ${BRIDGE_LENGTH_MIN}m 到 ${BRIDGE_LENGTH_MAX}m 之间`,
+      )
+    else if (bridgeLength < BRIDGE_LENGTH_MIN)
+      errs.push(`桥梁长度不能小于 ${BRIDGE_LENGTH_MIN}m`)
+    else if (bridgeLength > BRIDGE_LENGTH_MAX)
+      errs.push(`桥梁长度不能大于 ${BRIDGE_LENGTH_MAX}m`)
+    if (
+      clearance !== undefined &&
+      (!Number.isFinite(clearance) || clearance < 2 || clearance > 15)
+    )
+      errs.push('桥下净空必须在 2m 到 15m 之间')
+    if (
+      laneCount !== undefined &&
+      (!Number.isInteger(laneCount) || laneCount < 1 || laneCount > 8)
+    )
+      errs.push('车道数必须在 1 到 8 之间')
+    if (errs.length > 0) {
+      setBridgeErrors(errs)
+      return
+    }
+    setBridgeErrors([])
+    const result = createBridgeInfoMeasurementResult({
+      routeId,
+      obstacleId: obstacle.id,
+      targetId: activeTarget.id,
+      targetLabel: activeTarget.label,
+      bridgeName: obstacle.name,
+      bridgeKind: bridgeForm.bridgeKind,
+      loadLimitT: loadLimit,
+      deckWidthM: deckWidth,
+      bridgeLengthM: bridgeLength,
+      clearanceHeightM: clearance,
+      laneCount,
+      deckCondition: bridgeForm.deckCondition,
+      allowMeeting: bridgeForm.allowMeeting,
+      source: bridgeForm.source,
+      notes: bridgeForm.notes || undefined,
+    })
+    if ('error' in result) {
+      setBridgeErrors([result.error])
+      return
+    }
+    setBridgeResult(result)
+    useRouteSurveyStore.getState().upsertMeasurementDraft({
+      routeId,
+      obstacleId: obstacle.id,
+      measurementType: 'bridge',
+      status: 'measured',
+      valueSummary: result.valueLabel,
+      updatedAt: result.measuredAt,
+    })
   }
 
   if (targets.length === 0) {
@@ -600,7 +918,40 @@ function MeasurementPanel({
           <div style={{ fontSize: '13px', color: '#555' }}>
             {activeTarget.description}
           </div>
-          {activeTarget.suggestedPointPairs &&
+          {activeTarget.supportedTools.includes('curve') &&
+          activeTarget.curveKind ? (
+            <div style={{ marginTop: '12px' }}>
+              <CurveParameterForm
+                form={curveForm}
+                presetCurveParams={activeTarget.presetCurveParams}
+                onChange={setCurveForm}
+                errors={curveErrors}
+                onSave={handleCurveSave}
+                result={curveResult}
+                onClear={() => {
+                  setCurveResult(null)
+                  setCurveErrors([])
+                }}
+              />
+            </div>
+          ) : activeTarget.supportedTools.includes('bridge') &&
+            activeTarget.bridgeKind ? (
+            <div style={{ marginTop: '12px' }}>
+              <BridgeInfoForm
+                obstacle={obstacle}
+                form={bridgeForm}
+                onChange={setBridgeForm}
+                errors={bridgeErrors}
+                onSave={handleBridgeSave}
+                result={bridgeResult}
+                onClear={() => {
+                  setBridgeResult(null)
+                  setBridgeErrors([])
+                }}
+              />
+            </div>
+          ) : (
+            activeTarget.suggestedPointPairs &&
             activeTarget.suggestedPointPairs.length > 0 && (
               <div style={{ marginTop: '8px' }}>
                 <strong style={{ fontSize: '12px' }}>预设测量点：</strong>
@@ -635,7 +986,8 @@ function MeasurementPanel({
                   ))}
                 </div>
               </div>
-            )}
+            )
+          )}
         </div>
       )}
 
@@ -735,6 +1087,643 @@ function MeasurementPanel({
         >
           清除测量
         </button>
+      )}
+    </div>
+  )
+}
+
+const CURVE_KIND_DESCRIPTIONS: Record<CurveObstacleKind, string> = {
+  circular_curve: '圆弧弯道重点测量：半径、夹角、入口宽度、出口宽度。',
+  right_angle_curve:
+    '直交弯道重点测量：夹角、入口宽度、出口宽度、转角处有效宽度。',
+  compound_curve: '复合弯道参数测量：后续扩展，当前仅支持基础参数录入。',
+}
+
+function CurveParameterForm({
+  form,
+  onChange,
+  errors,
+  onSave,
+  result,
+  onClear,
+  presetCurveParams,
+}: {
+  form: {
+    curveKind: CurveObstacleKind
+    radiusM: string
+    angleDeg: string
+    entranceWidthM: string
+    exitWidthM: string
+    effectiveWidthM: string
+    source: CurveMeasurementSource
+    notes: string
+  }
+  onChange: (f: typeof form) => void
+  errors: string[]
+  onSave: () => void
+  result: CurveParameterMeasurementResult | null
+  onClear: () => void
+  presetCurveParams?: {
+    radiusM?: number
+    angleDeg?: number
+    entranceWidthM?: number
+    exitWidthM?: number
+  }
+}) {
+  const hasPreset =
+    presetCurveParams &&
+    (presetCurveParams.radiusM ||
+      presetCurveParams.angleDeg ||
+      presetCurveParams.entranceWidthM ||
+      presetCurveParams.exitWidthM)
+
+  const handleFillPreset = () => {
+    if (!presetCurveParams) return
+    onChange({
+      ...form,
+      radiusM: presetCurveParams.radiusM
+        ? String(presetCurveParams.radiusM)
+        : form.radiusM,
+      angleDeg: presetCurveParams.angleDeg
+        ? String(presetCurveParams.angleDeg)
+        : form.angleDeg,
+      entranceWidthM: presetCurveParams.entranceWidthM
+        ? String(presetCurveParams.entranceWidthM)
+        : form.entranceWidthM,
+      exitWidthM: presetCurveParams.exitWidthM
+        ? String(presetCurveParams.exitWidthM)
+        : form.exitWidthM,
+      source: 'teaching_config',
+    })
+  }
+
+  return (
+    <div data-testid="curve-parameter-form">
+      <div style={{ marginBottom: '8px' }}>
+        <strong style={{ fontSize: '12px' }}>弯道类型：</strong>
+        <span
+          data-testid="curve-kind"
+          style={{ fontSize: '13px', marginLeft: '4px' }}
+        >
+          {CURVE_OBSTACLE_KIND_LABELS[form.curveKind] ?? form.curveKind}
+        </span>
+        <div
+          data-testid="curve-kind-description"
+          style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+        >
+          {CURVE_KIND_DESCRIPTIONS[form.curveKind] ?? ''}
+        </div>
+      </div>
+
+      {hasPreset && (
+        <button
+          data-testid="btn-fill-preset-curve"
+          onClick={handleFillPreset}
+          style={{
+            padding: '4px 12px',
+            borderRadius: '4px',
+            border: '1px solid #1976d2',
+            background: '#e3f2fd',
+            cursor: 'pointer',
+            fontSize: '11px',
+            marginBottom: '8px',
+          }}
+        >
+          从教学配置填入
+        </button>
+      )}
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '8px',
+          marginBottom: '8px',
+        }}
+      >
+        <label style={formLabelStyle}>
+          <span>半径 (m) *</span>
+          <input
+            data-testid="curve-radius-input"
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={form.radiusM}
+            onChange={(e) => onChange({ ...form, radiusM: e.target.value })}
+            style={formInputStyle}
+            placeholder="弯道半径"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>夹角 (°) *</span>
+          <input
+            data-testid="curve-angle-input"
+            type="number"
+            step="0.01"
+            min="0.01"
+            max="180"
+            value={form.angleDeg}
+            onChange={(e) => onChange({ ...form, angleDeg: e.target.value })}
+            style={formInputStyle}
+            placeholder="弯道夹角"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>入口宽度 (m) *</span>
+          <input
+            data-testid="curve-entrance-input"
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={form.entranceWidthM}
+            onChange={(e) =>
+              onChange({ ...form, entranceWidthM: e.target.value })
+            }
+            style={formInputStyle}
+            placeholder="入口路面宽度"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>出口宽度 (m) *</span>
+          <input
+            data-testid="curve-exit-input"
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={form.exitWidthM}
+            onChange={(e) => onChange({ ...form, exitWidthM: e.target.value })}
+            style={formInputStyle}
+            placeholder="出口路面宽度"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>有效宽度 (m)</span>
+          <input
+            data-testid="curve-effective-input"
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={form.effectiveWidthM}
+            onChange={(e) =>
+              onChange({ ...form, effectiveWidthM: e.target.value })
+            }
+            style={formInputStyle}
+            placeholder="可选"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>参数来源</span>
+          <select
+            data-testid="curve-source-select"
+            value={form.source}
+            onChange={(e) =>
+              onChange({
+                ...form,
+                source: e.target.value as CurveMeasurementSource,
+              })
+            }
+            style={formInputStyle}
+          >
+            <option value="manual_input">手动录入</option>
+            <option value="preset_point_pair">预设点位计算</option>
+            <option value="teaching_config">教学配置</option>
+          </select>
+        </label>
+      </div>
+
+      <label
+        style={{ ...formLabelStyle, marginBottom: '8px', display: 'block' }}
+      >
+        <span>备注</span>
+        <textarea
+          data-testid="curve-notes-input"
+          value={form.notes}
+          onChange={(e) => onChange({ ...form, notes: e.target.value })}
+          style={{
+            ...formInputStyle,
+            width: '100%',
+            minHeight: '48px',
+            resize: 'vertical',
+          }}
+          placeholder="可选备注"
+        />
+      </label>
+
+      {errors.length > 0 && (
+        <div data-testid="curve-errors" style={curveErrorStyle}>
+          {errors.map((e, i) => (
+            <div key={i}>{e}</div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+        <button
+          data-testid="btn-save-curve"
+          onClick={onSave}
+          style={saveBtnStyle}
+        >
+          保存弯道参数
+        </button>
+        {result && (
+          <button
+            data-testid="btn-retake-curve"
+            onClick={onClear}
+            style={clearBtnStyle}
+          >
+            重测
+          </button>
+        )}
+      </div>
+
+      {result && (
+        <div data-testid="curve-result" style={curveResultBoxStyle}>
+          <div
+            style={{
+              fontWeight: 'bold',
+              fontSize: '14px',
+              marginBottom: '4px',
+            }}
+          >
+            弯道参数测量结果
+          </div>
+          <div data-testid="curve-result-radius" style={curveParamRowStyle}>
+            <span style={curveParamLabelStyle}>半径：</span>
+            <span style={curveParamValueStyle}>{result.radiusM} m</span>
+          </div>
+          <div data-testid="curve-result-angle" style={curveParamRowStyle}>
+            <span style={curveParamLabelStyle}>夹角：</span>
+            <span style={curveParamValueStyle}>{result.angleDeg}°</span>
+          </div>
+          <div data-testid="curve-result-entrance" style={curveParamRowStyle}>
+            <span style={curveParamLabelStyle}>入口宽度：</span>
+            <span style={curveParamValueStyle}>{result.entranceWidthM} m</span>
+          </div>
+          <div data-testid="curve-result-exit" style={curveParamRowStyle}>
+            <span style={curveParamLabelStyle}>出口宽度：</span>
+            <span style={curveParamValueStyle}>{result.exitWidthM} m</span>
+          </div>
+          {result.effectiveWidthM !== undefined && (
+            <div
+              data-testid="curve-result-effective"
+              style={curveParamRowStyle}
+            >
+              <span style={curveParamLabelStyle}>有效宽度：</span>
+              <span style={curveParamValueStyle}>
+                {result.effectiveWidthM} m
+              </span>
+            </div>
+          )}
+          <div
+            data-testid="curve-result-object"
+            style={{ fontSize: '13px', marginTop: '8px' }}
+          >
+            测量对象：{result.targetLabel}
+          </div>
+          <div
+            data-testid="curve-result-source"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            参数来源：
+            {CURVE_MEASUREMENT_SOURCE_LABELS[result.source] ?? result.source}
+          </div>
+          <div
+            data-testid="curve-result-kind"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            弯道类型：
+            {CURVE_OBSTACLE_KIND_LABELS[result.curveKind] ?? result.curveKind}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BridgeInfoForm({
+  obstacle,
+  form,
+  onChange,
+  errors,
+  onSave,
+  result,
+  onClear,
+}: {
+  obstacle: RouteObstacle
+  form: {
+    bridgeKind: BridgeKind
+    loadLimitT: string
+    deckWidthM: string
+    bridgeLengthM: string
+    clearanceHeightM: string
+    laneCount: string
+    deckCondition: BridgeDeckCondition
+    allowMeeting: boolean
+    source: BridgeParameterSource
+    notes: string
+  }
+  onChange: (f: typeof form) => void
+  errors: string[]
+  onSave: () => void
+  result: BridgeInfoMeasurementResult | null
+  onClear: () => void
+}) {
+  return (
+    <div data-testid="bridge-info-form">
+      <div
+        data-testid="bridge-info-card"
+        style={{
+          padding: '12px',
+          background: '#f5f5f5',
+          borderRadius: '6px',
+          marginBottom: '12px',
+        }}
+      >
+        <div
+          style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}
+        >
+          {obstacle.name}
+        </div>
+        <div style={{ fontSize: '13px', color: '#333' }}>
+          {obstacle.description}
+        </div>
+        <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+          类型：{ROUTE_OBSTACLE_TYPE_LABELS[obstacle.type] ?? obstacle.type} |
+          风险：
+          {obstacle.riskLevel === 'high'
+            ? '高'
+            : obstacle.riskLevel === 'medium'
+              ? '中'
+              : '低'}
+        </div>
+        <div
+          style={{
+            fontSize: '12px',
+            color: '#1565c0',
+            marginTop: '4px',
+            fontStyle: 'italic',
+          }}
+        >
+          {obstacle.teachingNote}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '8px' }}>
+        <strong style={{ fontSize: '12px' }}>桥梁类型：</strong>
+        <span
+          data-testid="bridge-kind"
+          style={{ fontSize: '13px', marginLeft: '4px' }}
+        >
+          {BRIDGE_KIND_LABELS[form.bridgeKind] ?? form.bridgeKind}
+        </span>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '8px',
+          marginBottom: '8px',
+        }}
+      >
+        <label style={formLabelStyle}>
+          <span>限载值 (t) *</span>
+          <input
+            data-testid="bridge-load-limit-input"
+            type="number"
+            step="1"
+            min={BRIDGE_LOAD_LIMIT_MIN}
+            max={BRIDGE_LOAD_LIMIT_MAX}
+            value={form.loadLimitT}
+            onChange={(e) => onChange({ ...form, loadLimitT: e.target.value })}
+            style={formInputStyle}
+            placeholder={`${BRIDGE_LOAD_LIMIT_MIN}-${BRIDGE_LOAD_LIMIT_MAX}t`}
+          />
+          <span style={{ fontSize: '11px', color: '#999' }}>
+            范围：{BRIDGE_LOAD_LIMIT_MIN}t - {BRIDGE_LOAD_LIMIT_MAX}t
+          </span>
+        </label>
+        <label style={formLabelStyle}>
+          <span>桥面宽度 (m) *</span>
+          <input
+            data-testid="bridge-deck-width-input"
+            type="number"
+            step="0.1"
+            min={BRIDGE_DECK_WIDTH_MIN}
+            max={BRIDGE_DECK_WIDTH_MAX}
+            value={form.deckWidthM}
+            onChange={(e) => onChange({ ...form, deckWidthM: e.target.value })}
+            style={formInputStyle}
+            placeholder={`${BRIDGE_DECK_WIDTH_MIN}-${BRIDGE_DECK_WIDTH_MAX}m`}
+          />
+          <span style={{ fontSize: '11px', color: '#999' }}>
+            范围：{BRIDGE_DECK_WIDTH_MIN}m - {BRIDGE_DECK_WIDTH_MAX}m
+          </span>
+        </label>
+        <label style={formLabelStyle}>
+          <span>桥梁长度 (m) *</span>
+          <input
+            data-testid="bridge-length-input"
+            type="number"
+            step="1"
+            min={BRIDGE_LENGTH_MIN}
+            max={BRIDGE_LENGTH_MAX}
+            value={form.bridgeLengthM}
+            onChange={(e) =>
+              onChange({ ...form, bridgeLengthM: e.target.value })
+            }
+            style={formInputStyle}
+            placeholder={`${BRIDGE_LENGTH_MIN}-${BRIDGE_LENGTH_MAX}m`}
+          />
+          <span style={{ fontSize: '11px', color: '#999' }}>
+            范围：{BRIDGE_LENGTH_MIN}m - {BRIDGE_LENGTH_MAX}m
+          </span>
+        </label>
+        <label style={formLabelStyle}>
+          <span>桥下净空 (m)</span>
+          <input
+            data-testid="bridge-clearance-input"
+            type="number"
+            step="0.1"
+            min="0"
+            value={form.clearanceHeightM}
+            onChange={(e) =>
+              onChange({ ...form, clearanceHeightM: e.target.value })
+            }
+            style={formInputStyle}
+            placeholder="可选"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>车道数</span>
+          <input
+            data-testid="bridge-lane-count-input"
+            type="number"
+            step="1"
+            min="1"
+            max="8"
+            value={form.laneCount}
+            onChange={(e) => onChange({ ...form, laneCount: e.target.value })}
+            style={formInputStyle}
+            placeholder="可选"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>参数来源</span>
+          <select
+            data-testid="bridge-source-select"
+            value={form.source}
+            onChange={(e) =>
+              onChange({
+                ...form,
+                source: e.target.value as BridgeParameterSource,
+              })
+            }
+            style={formInputStyle}
+          >
+            <option value="manual_input">手动录入</option>
+            <option value="field_sign">现场标牌</option>
+            <option value="survey_document">资料查询</option>
+            <option value="teacher_provided">教师给定</option>
+            <option value="teaching_config">教学配置</option>
+          </select>
+        </label>
+      </div>
+
+      <label
+        style={{ ...formLabelStyle, marginBottom: '8px', display: 'block' }}
+      >
+        <span>备注</span>
+        <textarea
+          data-testid="bridge-notes-input"
+          value={form.notes}
+          onChange={(e) => onChange({ ...form, notes: e.target.value })}
+          style={{
+            ...formInputStyle,
+            width: '100%',
+            minHeight: '48px',
+            resize: 'vertical',
+          }}
+          placeholder="可选备注"
+        />
+      </label>
+
+      {errors.length > 0 && (
+        <div
+          data-testid="bridge-errors"
+          style={{
+            padding: '8px',
+            background: '#ffebee',
+            borderRadius: '4px',
+            fontSize: '12px',
+            color: '#c62828',
+            marginTop: '8px',
+          }}
+        >
+          {errors.map((e, i) => (
+            <div key={i}>{e}</div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+        <button
+          data-testid="btn-save-bridge"
+          onClick={onSave}
+          style={{
+            padding: '6px 16px',
+            border: '1px solid #1976d2',
+            borderRadius: '4px',
+            background: '#1976d2',
+            color: '#fff',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: 'bold',
+          }}
+        >
+          保存桥梁信息
+        </button>
+        {result && (
+          <button
+            data-testid="btn-clear-bridge"
+            onClick={onClear}
+            style={{
+              padding: '6px 16px',
+              border: '1px solid #d0d7de',
+              borderRadius: '4px',
+              background: '#fff',
+              cursor: 'pointer',
+              fontSize: '12px',
+            }}
+          >
+            重填
+          </button>
+        )}
+      </div>
+
+      {result && (
+        <div
+          data-testid="bridge-result"
+          style={{
+            padding: '12px',
+            background: '#e8f5e9',
+            borderRadius: '6px',
+            marginTop: '12px',
+          }}
+        >
+          <div
+            style={{
+              fontWeight: 'bold',
+              fontSize: '14px',
+              marginBottom: '4px',
+            }}
+          >
+            桥梁信息保存结果
+          </div>
+          <div data-testid="bridge-result-name" style={{ fontSize: '13px' }}>
+            桥梁名称：{result.bridgeName}
+          </div>
+          <div data-testid="bridge-result-kind" style={{ fontSize: '13px' }}>
+            桥梁类型：
+            {BRIDGE_KIND_LABELS[result.bridgeKind] ?? result.bridgeKind}
+          </div>
+          <div
+            data-testid="bridge-result-load-limit"
+            style={{ fontSize: '13px' }}
+          >
+            限载值：{result.loadLimitT} t
+          </div>
+          <div
+            data-testid="bridge-result-deck-width"
+            style={{ fontSize: '13px' }}
+          >
+            桥面宽度：{result.deckWidthM} m
+          </div>
+          <div data-testid="bridge-result-length" style={{ fontSize: '13px' }}>
+            桥梁长度：{result.bridgeLengthM} m
+          </div>
+          {result.clearanceHeightM !== undefined && (
+            <div
+              data-testid="bridge-result-clearance"
+              style={{ fontSize: '13px' }}
+            >
+              桥下净空：{result.clearanceHeightM} m
+            </div>
+          )}
+          <div
+            data-testid="bridge-result-source"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            参数来源：
+            {BRIDGE_PARAMETER_SOURCE_LABELS[result.source] ?? result.source}
+          </div>
+          <div
+            data-testid="bridge-result-object"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            测量对象：{result.targetLabel}
+          </div>
+        </div>
       )}
     </div>
   )

@@ -16,6 +16,8 @@ import {
   calculateSlopeAngleDeg,
   createSlopeMeasurementResult,
   validateSlopeMeasurementResult,
+  createCurveParameterResult,
+  createBridgeInfoMeasurementResult,
   type MeasurementPoint,
   type MeasurementTarget,
 } from './measurements'
@@ -343,13 +345,19 @@ describe('getMeasurementTargetsForObstacle', () => {
     expect(targets[0].supportedTools).toContain('height')
   })
 
-  it('each target has suggestedPointPairs', () => {
+  it('each target has point pairs or form metadata', () => {
     for (const route of SURVEY_ROUTES) {
       for (const obs of route.obstacles) {
         const targets = getMeasurementTargetsForObstacle(route.id, obs)
         for (const t of targets) {
-          expect(t.suggestedPointPairs).toBeDefined()
-          expect(t.suggestedPointPairs!.length).toBeGreaterThanOrEqual(1)
+          if (t.supportedTools.includes('curve')) {
+            expect(t.curveKind).toBeDefined()
+          } else if (t.supportedTools.includes('bridge')) {
+            expect(t.bridgeKind).toBeDefined()
+          } else {
+            expect(t.suggestedPointPairs).toBeDefined()
+            expect(t.suggestedPointPairs!.length).toBeGreaterThanOrEqual(1)
+          }
         }
       }
     }
@@ -600,5 +608,80 @@ describe('Slope targets for slope obstacles', () => {
       t.supportedTools.includes('height'),
     )
     expect(heightTarget).toBeDefined()
+  })
+})
+
+describe('Day61 and Day62 integrated measurement targets', () => {
+  it('curve obstacle exposes a curve parameter target', () => {
+    const route = SURVEY_ROUTES.find((r) =>
+      r.obstacles.some((o) => o.type === 'curve'),
+    )!
+    const obs = route.obstacles.find((o) => o.type === 'curve')!
+    const targets = getMeasurementTargetsForObstacle(route.id, obs)
+    const curveTarget = targets.find((t) => t.supportedTools.includes('curve'))
+
+    expect(curveTarget).toBeDefined()
+    expect(curveTarget!.targetType).toBe('curve_parameters')
+    expect(curveTarget!.curveKind).toBeDefined()
+  })
+
+  it('bridge obstacle keeps distance target and exposes bridge info target', () => {
+    const route = SURVEY_ROUTES.find((r) =>
+      r.obstacles.some((o) => o.type === 'bridge'),
+    )!
+    const obs = route.obstacles.find((o) => o.type === 'bridge')!
+    const targets = getMeasurementTargetsForObstacle(route.id, obs)
+
+    expect(targets.some((t) => t.supportedTools.includes('distance'))).toBe(
+      true,
+    )
+    const bridgeTarget = targets.find((t) =>
+      t.supportedTools.includes('bridge'),
+    )
+    expect(bridgeTarget).toBeDefined()
+    expect(bridgeTarget!.targetType).toBe('bridge_info')
+    expect(bridgeTarget!.bridgeKind).toBeDefined()
+  })
+
+  it('rejects invalid optional curve effective width', () => {
+    const result = createCurveParameterResult({
+      routeId: 'route_a_urban_low_bridge',
+      obstacleId: 'obs_a2_ring_road_curve',
+      targetId: 'target_curve',
+      targetLabel: '弯道参数',
+      curveKind: 'circular_curve',
+      radiusM: 25,
+      angleDeg: 90,
+      entranceWidthM: 6,
+      exitWidthM: 5.5,
+      effectiveWidthM: -1,
+      source: 'manual_input',
+    })
+
+    expect('error' in result).toBe(true)
+    if ('error' in result) expect(result.error).toContain('有效宽度')
+  })
+
+  it('rejects invalid optional bridge clearance and lane count', () => {
+    const result = createBridgeInfoMeasurementResult({
+      routeId: 'route_b_industrial_direct',
+      obstacleId: 'obs_b1_canal_bridge',
+      targetId: 'target_bridge',
+      targetLabel: '桥梁信息',
+      bridgeName: '运河公路桥梁',
+      bridgeKind: 'medium_bridge',
+      loadLimitT: 200,
+      deckWidthM: 8,
+      bridgeLengthM: 50,
+      clearanceHeightM: 1,
+      laneCount: 9,
+      source: 'manual_input',
+    })
+
+    expect('error' in result).toBe(true)
+    if ('error' in result) {
+      expect(result.error).toContain('桥下净空')
+      expect(result.error).toContain('车道数')
+    }
   })
 })
