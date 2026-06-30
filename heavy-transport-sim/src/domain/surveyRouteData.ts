@@ -79,6 +79,10 @@ export const SURVEY_ROUTES: SurveyRoute[] = [
           outerRadius: null,
           unit: 'm',
           roadWidth: null,
+          curveKind: 'circular_curve',
+          curveAngleDeg: null,
+          entranceWidth: null,
+          exitWidth: null,
         },
         teachingNote:
           '环岛弯道需要同时检查内侧不刮擦和外侧不越界。全挂车组合倒车难度高，需要特别注意。',
@@ -326,6 +330,10 @@ export const SURVEY_ROUTES: SurveyRoute[] = [
           outerRadius: null,
           unit: 'm',
           roadWidth: null,
+          curveKind: 'circular_curve',
+          curveAngleDeg: null,
+          entranceWidth: null,
+          exitWidth: null,
         },
         teachingNote:
           '下坡弯道对车辆制动和转向同时提出要求。需要综合考虑坡度和弯道半径。',

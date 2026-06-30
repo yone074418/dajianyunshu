@@ -13,8 +13,38 @@ export const MEASUREMENT_TOOL_TYPES_ALL = [
   'distance',
   'height',
   'slope',
+  'curve',
 ] as const
 export type MeasurementToolTypeAll = (typeof MEASUREMENT_TOOL_TYPES_ALL)[number]
+
+export const CURVE_OBSTACLE_KINDS = [
+  'circular_curve',
+  'right_angle_curve',
+  'compound_curve',
+] as const
+export type CurveObstacleKind = (typeof CURVE_OBSTACLE_KINDS)[number]
+
+export const CURVE_OBSTACLE_KIND_LABELS: Record<CurveObstacleKind, string> = {
+  circular_curve: '圆弧弯道',
+  right_angle_curve: '直交弯道',
+  compound_curve: '复合弯道',
+}
+
+export const CURVE_MEASUREMENT_SOURCES = [
+  'manual_input',
+  'preset_point_pair',
+  'teaching_config',
+] as const
+export type CurveMeasurementSource = (typeof CURVE_MEASUREMENT_SOURCES)[number]
+
+export const CURVE_MEASUREMENT_SOURCE_LABELS: Record<
+  CurveMeasurementSource,
+  string
+> = {
+  manual_input: '手动录入',
+  preset_point_pair: '预设点位计算',
+  teaching_config: '教学配置',
+}
 
 export const measurementPointSchema = z.object({
   id: nonEmptyString,
@@ -33,10 +63,13 @@ export const measurementTargetSchema = z.object({
     'road_width',
     'obstacle_distance',
     'shoulder_distance',
+    'curve_parameters',
   ]),
   label: nonEmptyString,
   description: nonEmptyString,
-  supportedTools: z.array(z.enum(['distance', 'height', 'slope'])).min(1),
+  supportedTools: z
+    .array(z.enum(['distance', 'height', 'slope', 'curve']))
+    .min(1),
   suggestedPointPairs: z
     .array(
       z.object({
@@ -46,6 +79,15 @@ export const measurementTargetSchema = z.object({
         pointB: positionTuple,
       }),
     )
+    .optional(),
+  curveKind: z.enum(CURVE_OBSTACLE_KINDS).optional(),
+  presetCurveParams: z
+    .object({
+      radiusM: z.number().positive().optional(),
+      angleDeg: z.number().positive().max(180).optional(),
+      entranceWidthM: z.number().positive().optional(),
+      exitWidthM: z.number().positive().optional(),
+    })
     .optional(),
 })
 
@@ -290,30 +332,40 @@ export function getMeasurementTargetsForObstacle(
   }
 
   if (obstacle.type === 'curve') {
+    const curveKind: CurveObstacleKind =
+      (obstacle.measurementPlaceholders?.curveKind as CurveObstacleKind) ??
+      'circular_curve'
+    const presetRadius =
+      typeof obstacle.measurementPlaceholders?.innerRadius === 'number'
+        ? obstacle.measurementPlaceholders.innerRadius
+        : undefined
+    const presetAngle =
+      typeof obstacle.measurementPlaceholders?.curveAngleDeg === 'number'
+        ? obstacle.measurementPlaceholders.curveAngleDeg
+        : undefined
+    const presetEntrance =
+      typeof obstacle.measurementPlaceholders?.entranceWidth === 'number'
+        ? obstacle.measurementPlaceholders.entranceWidth
+        : undefined
+    const presetExit =
+      typeof obstacle.measurementPlaceholders?.exitWidth === 'number'
+        ? obstacle.measurementPlaceholders.exitWidth
+        : undefined
     targets.push({
-      id: `target_${obstacle.id}_road_width`,
+      id: `target_${obstacle.id}_curve_params`,
       routeId,
       obstacleId: obstacle.id,
-      targetType: 'road_width',
-      label: `${obstacle.name} - 弯道宽度`,
-      description: `测量${obstacle.name}处弯道路面宽度`,
-      supportedTools: ['distance'],
-      suggestedPointPairs: [
-        {
-          id: `sp_${obstacle.id}_inner_outer`,
-          label: '内侧路缘 → 外侧路缘',
-          pointA: [
-            obstacle.position[0],
-            obstacle.position[1],
-            obstacle.position[2] - 4,
-          ],
-          pointB: [
-            obstacle.position[0],
-            obstacle.position[1],
-            obstacle.position[2] + 4,
-          ],
-        },
-      ],
+      targetType: 'curve_parameters',
+      label: `${obstacle.name} - 弯道参数`,
+      description: `测量${obstacle.name}的弯道半径、夹角、入口宽度和出口宽度`,
+      supportedTools: ['curve'],
+      curveKind,
+      presetCurveParams: {
+        radiusM: presetRadius,
+        angleDeg: presetAngle,
+        entranceWidthM: presetEntrance,
+        exitWidthM: presetExit,
+      },
     })
   }
 
@@ -516,4 +568,163 @@ export function validateSlopeMeasurementResult(
   }
 
   return { success: errors.length === 0, errors }
+}
+
+export const curveParameterMeasurementResultSchema = z.object({
+  id: nonEmptyString,
+  routeId: nonEmptyString,
+  obstacleId: nonEmptyString,
+  targetId: nonEmptyString,
+  targetLabel: nonEmptyString,
+  toolType: z.literal('curve'),
+  curveKind: z.enum(CURVE_OBSTACLE_KINDS),
+  radiusM: z.number().positive(),
+  angleDeg: z.number().positive().max(180),
+  entranceWidthM: z.number().positive(),
+  exitWidthM: z.number().positive(),
+  effectiveWidthM: z.number().positive().optional(),
+  innerClearanceM: z.number().min(0).optional(),
+  outerClearanceM: z.number().min(0).optional(),
+  source: z.enum(CURVE_MEASUREMENT_SOURCES),
+  valueLabel: nonEmptyString,
+  measuredAt: nonEmptyString,
+  notes: z.string().optional(),
+})
+
+export type CurveParameterMeasurementResult = z.infer<
+  typeof curveParameterMeasurementResultSchema
+>
+
+export function createCurveParameterResult(input: {
+  routeId: string
+  obstacleId: string
+  targetId: string
+  targetLabel: string
+  curveKind: CurveObstacleKind
+  radiusM: number
+  angleDeg: number
+  entranceWidthM: number
+  exitWidthM: number
+  effectiveWidthM?: number
+  innerClearanceM?: number
+  outerClearanceM?: number
+  source: CurveMeasurementSource
+  notes?: string
+}): CurveParameterMeasurementResult | { error: string } {
+  const validationErrors: string[] = []
+  if (!input.routeId) validationErrors.push('routeId 不能为空')
+  if (!input.obstacleId) validationErrors.push('obstacleId 不能为空')
+  if (!input.targetId) validationErrors.push('targetId 不能为空')
+  if (!input.targetLabel) validationErrors.push('targetLabel 不能为空')
+  if (input.radiusM <= 0) validationErrors.push('半径必须大于 0')
+  if (input.angleDeg <= 0 || input.angleDeg > 180)
+    validationErrors.push('夹角必须大于 0 且小于等于 180')
+  if (input.entranceWidthM <= 0) validationErrors.push('入口宽度必须大于 0')
+  if (input.exitWidthM <= 0) validationErrors.push('出口宽度必须大于 0')
+  if (validationErrors.length > 0) return { error: validationErrors.join('; ') }
+
+  const routeExists = SURVEY_ROUTES.some((r) => r.id === input.routeId)
+  if (!routeExists) return { error: `路线 "${input.routeId}" 不存在` }
+  const route = SURVEY_ROUTES.find((r) => r.id === input.routeId)
+  const obsExists = route?.obstacles.some((o) => o.id === input.obstacleId)
+  if (!obsExists)
+    return {
+      error: `障碍 "${input.obstacleId}" 不属于路线 "${input.routeId}"`,
+    }
+
+  const rd = Math.round(input.radiusM * 100) / 100
+  const ag = Math.round(input.angleDeg * 100) / 100
+  const ew = Math.round(input.entranceWidthM * 100) / 100
+  const xw = Math.round(input.exitWidthM * 100) / 100
+  const kindLabel =
+    CURVE_OBSTACLE_KIND_LABELS[input.curveKind] ?? input.curveKind
+
+  return {
+    id: `curve-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    routeId: input.routeId,
+    obstacleId: input.obstacleId,
+    targetId: input.targetId,
+    targetLabel: input.targetLabel,
+    toolType: 'curve',
+    curveKind: input.curveKind,
+    radiusM: rd,
+    angleDeg: ag,
+    entranceWidthM: ew,
+    exitWidthM: xw,
+    effectiveWidthM: input.effectiveWidthM
+      ? Math.round(input.effectiveWidthM * 100) / 100
+      : undefined,
+    innerClearanceM: input.innerClearanceM
+      ? Math.round(input.innerClearanceM * 100) / 100
+      : undefined,
+    outerClearanceM: input.outerClearanceM
+      ? Math.round(input.outerClearanceM * 100) / 100
+      : undefined,
+    source: input.source,
+    valueLabel: `${kindLabel} 半径${rd}m 夹角${ag}° 入口${ew}m 出口${xw}m`,
+    measuredAt: new Date().toISOString(),
+    notes: input.notes,
+  }
+}
+
+export function validateCurveParameterMeasurementResult(
+  result: unknown,
+): MeasurementValidationResult {
+  const errors: string[] = []
+  const parsed = curveParameterMeasurementResultSchema.safeParse(result)
+  if (!parsed.success) {
+    for (const issue of parsed.error.issues) {
+      const path = issue.path.length > 0 ? issue.path.join('.') + ': ' : ''
+      errors.push(path + issue.message)
+    }
+    return { success: false, errors }
+  }
+
+  const data = parsed.data
+
+  const routeExists = SURVEY_ROUTES.some((r) => r.id === data.routeId)
+  if (!routeExists) {
+    errors.push(`路线 "${data.routeId}" 不存在`)
+  } else {
+    const route = SURVEY_ROUTES.find((r) => r.id === data.routeId)
+    const obsExists = route?.obstacles.some((o) => o.id === data.obstacleId)
+    if (!obsExists) {
+      errors.push(`障碍 "${data.obstacleId}" 不属于路线 "${data.routeId}"`)
+    } else {
+      const obs = route?.obstacles.find((o) => o.id === data.obstacleId)
+      if (obs && obs.type !== 'curve') {
+        errors.push(
+          `障碍 "${data.obstacleId}" 不是弯道类型，不能提交弯道测量结果`,
+        )
+      }
+    }
+  }
+
+  return { success: errors.length === 0, errors }
+}
+
+export function formatCurveParameterSummary(
+  result: CurveParameterMeasurementResult,
+): string {
+  const kindLabel =
+    CURVE_OBSTACLE_KIND_LABELS[result.curveKind] ?? result.curveKind
+  const sourceLabel =
+    CURVE_MEASUREMENT_SOURCE_LABELS[result.source] ?? result.source
+  const lines = [
+    `弯道类型：${kindLabel}`,
+    `半径：${result.radiusM} m`,
+    `夹角：${result.angleDeg}°`,
+    `入口宽度：${result.entranceWidthM} m`,
+    `出口宽度：${result.exitWidthM} m`,
+  ]
+  if (result.effectiveWidthM !== undefined)
+    lines.push(`有效宽度：${result.effectiveWidthM} m`)
+  if (result.innerClearanceM !== undefined)
+    lines.push(`内侧障碍距离：${result.innerClearanceM} m`)
+  if (result.outerClearanceM !== undefined)
+    lines.push(`外侧障碍距离：${result.outerClearanceM} m`)
+  lines.push(`参数来源：${sourceLabel}`)
+  lines.push(`测量时间：${result.measuredAt}`)
+  if (result.notes) lines.push(`备注：${result.notes}`)
+  return lines.join('\n')
 }

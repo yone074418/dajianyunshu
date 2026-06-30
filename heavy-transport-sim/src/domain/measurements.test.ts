@@ -16,8 +16,13 @@ import {
   calculateSlopeAngleDeg,
   createSlopeMeasurementResult,
   validateSlopeMeasurementResult,
+  curveParameterMeasurementResultSchema,
+  createCurveParameterResult,
+  validateCurveParameterMeasurementResult,
+  formatCurveParameterSummary,
   type MeasurementPoint,
   type MeasurementTarget,
+  type CurveParameterMeasurementResult,
 } from './measurements'
 import { SURVEY_ROUTES } from './surveyRouteData'
 
@@ -343,13 +348,17 @@ describe('getMeasurementTargetsForObstacle', () => {
     expect(targets[0].supportedTools).toContain('height')
   })
 
-  it('each target has suggestedPointPairs', () => {
+  it('each target has suggestedPointPairs or is a curve target', () => {
     for (const route of SURVEY_ROUTES) {
       for (const obs of route.obstacles) {
         const targets = getMeasurementTargetsForObstacle(route.id, obs)
         for (const t of targets) {
-          expect(t.suggestedPointPairs).toBeDefined()
-          expect(t.suggestedPointPairs!.length).toBeGreaterThanOrEqual(1)
+          if (t.supportedTools.includes('curve')) {
+            expect(t.curveKind).toBeDefined()
+          } else {
+            expect(t.suggestedPointPairs).toBeDefined()
+            expect(t.suggestedPointPairs!.length).toBeGreaterThanOrEqual(1)
+          }
         }
       }
     }
@@ -600,5 +609,354 @@ describe('Slope targets for slope obstacles', () => {
       t.supportedTools.includes('height'),
     )
     expect(heightTarget).toBeDefined()
+  })
+})
+
+describe('Curve parameter measurement schema', () => {
+  it('can be imported', () => {
+    expect(curveParameterMeasurementResultSchema).toBeDefined()
+  })
+
+  it('valid curve result passes schema', () => {
+    const r = {
+      id: 'curve-1',
+      routeId: 'route_a_urban_low_bridge',
+      obstacleId: 'obs_a2_ring_road_curve',
+      targetId: 'target_obs_a2_ring_road_curve_curve_params',
+      targetLabel: '城西环岛右转弯道 - 弯道参数',
+      toolType: 'curve' as const,
+      curveKind: 'circular_curve' as const,
+      radiusM: 25,
+      angleDeg: 90,
+      entranceWidthM: 6,
+      exitWidthM: 5.5,
+      source: 'manual_input' as const,
+      valueLabel: '圆弧弯道 半径25m 夹角90° 入口6m 出口5.5m',
+      measuredAt: new Date().toISOString(),
+    }
+    expect(curveParameterMeasurementResultSchema.safeParse(r).success).toBe(
+      true,
+    )
+  })
+})
+
+describe('createCurveParameterResult', () => {
+  const baseInput = {
+    routeId: 'route_a_urban_low_bridge',
+    obstacleId: 'obs_a2_ring_road_curve',
+    targetId: 'target_curve',
+    targetLabel: '城西环岛右转弯道 - 弯道参数',
+    curveKind: 'circular_curve' as const,
+    source: 'manual_input' as const,
+  }
+
+  it('creates valid curve result', () => {
+    const r = createCurveParameterResult({
+      ...baseInput,
+      radiusM: 25,
+      angleDeg: 90,
+      entranceWidthM: 6,
+      exitWidthM: 5.5,
+    })
+    expect('error' in r).toBe(false)
+    if (!('error' in r)) {
+      expect(r.toolType).toBe('curve')
+      expect(r.curveKind).toBe('circular_curve')
+      expect(r.radiusM).toBe(25)
+      expect(r.angleDeg).toBe(90)
+      expect(r.entranceWidthM).toBe(6)
+      expect(r.exitWidthM).toBe(5.5)
+      expect(r.source).toBe('manual_input')
+      expect(r.valueLabel).toContain('圆弧弯道')
+      expect(r.valueLabel).toContain('半径25m')
+      expect(r.valueLabel).toContain('夹角90°')
+    }
+  })
+
+  it('returns error for radiusM = 0', () => {
+    const r = createCurveParameterResult({
+      ...baseInput,
+      radiusM: 0,
+      angleDeg: 90,
+      entranceWidthM: 6,
+      exitWidthM: 5.5,
+    })
+    expect('error' in r).toBe(true)
+    if ('error' in r) expect(r.error).toContain('半径')
+  })
+
+  it('returns error for negative radiusM', () => {
+    const r = createCurveParameterResult({
+      ...baseInput,
+      radiusM: -5,
+      angleDeg: 90,
+      entranceWidthM: 6,
+      exitWidthM: 5.5,
+    })
+    expect('error' in r).toBe(true)
+  })
+
+  it('returns error for angleDeg = 0', () => {
+    const r = createCurveParameterResult({
+      ...baseInput,
+      radiusM: 25,
+      angleDeg: 0,
+      entranceWidthM: 6,
+      exitWidthM: 5.5,
+    })
+    expect('error' in r).toBe(true)
+    if ('error' in r) expect(r.error).toContain('夹角')
+  })
+
+  it('returns error for negative angleDeg', () => {
+    const r = createCurveParameterResult({
+      ...baseInput,
+      radiusM: 25,
+      angleDeg: -10,
+      entranceWidthM: 6,
+      exitWidthM: 5.5,
+    })
+    expect('error' in r).toBe(true)
+  })
+
+  it('returns error for angleDeg > 180', () => {
+    const r = createCurveParameterResult({
+      ...baseInput,
+      radiusM: 25,
+      angleDeg: 200,
+      entranceWidthM: 6,
+      exitWidthM: 5.5,
+    })
+    expect('error' in r).toBe(true)
+  })
+
+  it('returns error for entranceWidthM = 0', () => {
+    const r = createCurveParameterResult({
+      ...baseInput,
+      radiusM: 25,
+      angleDeg: 90,
+      entranceWidthM: 0,
+      exitWidthM: 5.5,
+    })
+    expect('error' in r).toBe(true)
+    if ('error' in r) expect(r.error).toContain('入口宽度')
+  })
+
+  it('returns error for negative entranceWidthM', () => {
+    const r = createCurveParameterResult({
+      ...baseInput,
+      radiusM: 25,
+      angleDeg: 90,
+      entranceWidthM: -3,
+      exitWidthM: 5.5,
+    })
+    expect('error' in r).toBe(true)
+  })
+
+  it('returns error for exitWidthM = 0', () => {
+    const r = createCurveParameterResult({
+      ...baseInput,
+      radiusM: 25,
+      angleDeg: 90,
+      entranceWidthM: 6,
+      exitWidthM: 0,
+    })
+    expect('error' in r).toBe(true)
+    if ('error' in r) expect(r.error).toContain('出口宽度')
+  })
+
+  it('returns error for negative exitWidthM', () => {
+    const r = createCurveParameterResult({
+      ...baseInput,
+      radiusM: 25,
+      angleDeg: 90,
+      entranceWidthM: 6,
+      exitWidthM: -2,
+    })
+    expect('error' in r).toBe(true)
+  })
+
+  it('returns error for empty routeId', () => {
+    const r = createCurveParameterResult({
+      ...baseInput,
+      routeId: '',
+      radiusM: 25,
+      angleDeg: 90,
+      entranceWidthM: 6,
+      exitWidthM: 5.5,
+    })
+    expect('error' in r).toBe(true)
+  })
+
+  it('returns error for empty obstacleId', () => {
+    const r = createCurveParameterResult({
+      ...baseInput,
+      obstacleId: '',
+      radiusM: 25,
+      angleDeg: 90,
+      entranceWidthM: 6,
+      exitWidthM: 5.5,
+    })
+    expect('error' in r).toBe(true)
+  })
+
+  it('returns error for empty targetId', () => {
+    const r = createCurveParameterResult({
+      ...baseInput,
+      targetId: '',
+      radiusM: 25,
+      angleDeg: 90,
+      entranceWidthM: 6,
+      exitWidthM: 5.5,
+    })
+    expect('error' in r).toBe(true)
+  })
+
+  it('returns error for nonexistent route', () => {
+    const r = createCurveParameterResult({
+      ...baseInput,
+      routeId: 'nonexistent',
+      radiusM: 25,
+      angleDeg: 90,
+      entranceWidthM: 6,
+      exitWidthM: 5.5,
+    })
+    expect('error' in r).toBe(true)
+    if ('error' in r) expect(r.error).toContain('不存在')
+  })
+
+  it('includes optional fields when provided', () => {
+    const r = createCurveParameterResult({
+      ...baseInput,
+      radiusM: 25,
+      angleDeg: 90,
+      entranceWidthM: 6,
+      exitWidthM: 5.5,
+      effectiveWidthM: 4.8,
+      innerClearanceM: 1.2,
+      outerClearanceM: 2.0,
+      notes: '测试备注',
+    })
+    if (!('error' in r)) {
+      expect(r.effectiveWidthM).toBe(4.8)
+      expect(r.innerClearanceM).toBe(1.2)
+      expect(r.outerClearanceM).toBe(2.0)
+      expect(r.notes).toBe('测试备注')
+    }
+  })
+})
+
+describe('validateCurveParameterMeasurementResult', () => {
+  const validResult: CurveParameterMeasurementResult = {
+    id: 'curve-1',
+    routeId: 'route_a_urban_low_bridge',
+    obstacleId: 'obs_a2_ring_road_curve',
+    targetId: 'target_curve',
+    targetLabel: '城西环岛右转弯道 - 弯道参数',
+    toolType: 'curve',
+    curveKind: 'circular_curve',
+    radiusM: 25,
+    angleDeg: 90,
+    entranceWidthM: 6,
+    exitWidthM: 5.5,
+    source: 'manual_input',
+    valueLabel: '圆弧弯道 半径25m 夹角90° 入口6m 出口5.5m',
+    measuredAt: new Date().toISOString(),
+  }
+
+  it('valid result passes validation', () => {
+    const v = validateCurveParameterMeasurementResult(validResult)
+    expect(v.success).toBe(true)
+    expect(v.errors).toEqual([])
+  })
+
+  it('fails for nonexistent route', () => {
+    const v = validateCurveParameterMeasurementResult({
+      ...validResult,
+      routeId: 'nonexistent',
+    })
+    expect(v.success).toBe(false)
+    expect(v.errors.some((e) => e.includes('不存在'))).toBe(true)
+  })
+
+  it('fails for obstacle not belonging to route', () => {
+    const v = validateCurveParameterMeasurementResult({
+      ...validResult,
+      obstacleId: 'nonexistent_obs',
+    })
+    expect(v.success).toBe(false)
+  })
+
+  it('fails for non-curve obstacle type', () => {
+    const v = validateCurveParameterMeasurementResult({
+      ...validResult,
+      obstacleId: 'obs_a1_railway_bridge',
+    })
+    expect(v.success).toBe(false)
+    expect(v.errors.some((e) => e.includes('不是弯道类型'))).toBe(true)
+  })
+
+  it('fails for null input', () => {
+    const v = validateCurveParameterMeasurementResult(null)
+    expect(v.success).toBe(false)
+  })
+})
+
+describe('formatCurveParameterSummary', () => {
+  it('formats summary with all fields', () => {
+    const result: CurveParameterMeasurementResult = {
+      id: 'curve-1',
+      routeId: 'route_a_urban_low_bridge',
+      obstacleId: 'obs_a2_ring_road_curve',
+      targetId: 'target_curve',
+      targetLabel: '城西环岛右转弯道 - 弯道参数',
+      toolType: 'curve',
+      curveKind: 'circular_curve',
+      radiusM: 25,
+      angleDeg: 90,
+      entranceWidthM: 6,
+      exitWidthM: 5.5,
+      effectiveWidthM: 4.8,
+      source: 'manual_input',
+      valueLabel: 'test',
+      measuredAt: '2026-06-30T10:00:00Z',
+      notes: '测试备注',
+    }
+    const summary = formatCurveParameterSummary(result)
+    expect(summary).toContain('圆弧弯道')
+    expect(summary).toContain('半径：25 m')
+    expect(summary).toContain('夹角：90°')
+    expect(summary).toContain('入口宽度：6 m')
+    expect(summary).toContain('出口宽度：5.5 m')
+    expect(summary).toContain('有效宽度：4.8 m')
+    expect(summary).toContain('手动录入')
+    expect(summary).toContain('测试备注')
+  })
+})
+
+describe('Curve targets for curve obstacles', () => {
+  it('curve obstacle has curve parameter target with curve tool', () => {
+    const obs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    const targets = getMeasurementTargetsForObstacle(SURVEY_ROUTES[0].id, obs)
+    const curveTarget = targets.find((t) => t.supportedTools.includes('curve'))
+    expect(curveTarget).toBeDefined()
+    expect(curveTarget!.targetType).toBe('curve_parameters')
+    expect(curveTarget!.curveKind).toBeDefined()
+  })
+
+  it('curve target has presetCurveParams', () => {
+    const obs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    const targets = getMeasurementTargetsForObstacle(SURVEY_ROUTES[0].id, obs)
+    const curveTarget = targets.find((t) => t.supportedTools.includes('curve'))
+    expect(curveTarget).toBeDefined()
+    expect(curveTarget!.presetCurveParams).toBeDefined()
+  })
+
+  it('route C curve obstacle also has curve target', () => {
+    const obs = SURVEY_ROUTES[2].obstacles.find((o) => o.type === 'curve')!
+    const targets = getMeasurementTargetsForObstacle(SURVEY_ROUTES[2].id, obs)
+    const curveTarget = targets.find((t) => t.supportedTools.includes('curve'))
+    expect(curveTarget).toBeDefined()
+    expect(curveTarget!.curveKind).toBeDefined()
   })
 })

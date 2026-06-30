@@ -191,4 +191,377 @@ describe('RouteSurveyPage', () => {
       .getObstacleMeasurementStatus(SURVEY_ROUTES[2].id, slopeObs.id)
     expect(status).toBe('measured')
   })
+
+  it('shows curve parameter form when curve obstacle selected', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    const curveTarget = targetButtons.find((b) =>
+      b.textContent?.includes('弯道参数'),
+    )
+    expect(curveTarget).toBeDefined()
+    fireEvent.click(curveTarget!)
+    expect(screen.getByTestId('curve-parameter-form')).toBeDefined()
+  })
+
+  it('curve parameter form shows radius input with unit m', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    const radiusInput = screen.getByTestId('curve-radius-input')
+    expect(radiusInput).toBeDefined()
+    expect(screen.getByText(/半径.*m/)).toBeDefined()
+  })
+
+  it('curve parameter form shows angle input with unit °', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    const angleInput = screen.getByTestId('curve-angle-input')
+    expect(angleInput).toBeDefined()
+    expect(screen.getByText(/夹角.*°/)).toBeDefined()
+  })
+
+  it('curve parameter form shows entrance width input with unit m', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    expect(screen.getByTestId('curve-entrance-input')).toBeDefined()
+    expect(screen.getByText(/入口宽度.*m/)).toBeDefined()
+  })
+
+  it('curve parameter form shows exit width input with unit m', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    expect(screen.getByTestId('curve-exit-input')).toBeDefined()
+    expect(screen.getByText(/出口宽度.*m/)).toBeDefined()
+  })
+
+  it('curve parameter form shows curve kind', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    const kindEl = screen.getByTestId('curve-kind')
+    expect(kindEl).toBeDefined()
+    expect(kindEl.textContent).toContain('圆弧弯道')
+  })
+
+  it('curve parameter form shows source selector', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    expect(screen.getByTestId('curve-source-select')).toBeDefined()
+  })
+
+  it('saves curve parameters and shows result', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    fireEvent.change(screen.getByTestId('curve-radius-input'), {
+      target: { value: '25' },
+    })
+    fireEvent.change(screen.getByTestId('curve-angle-input'), {
+      target: { value: '90' },
+    })
+    fireEvent.change(screen.getByTestId('curve-entrance-input'), {
+      target: { value: '6' },
+    })
+    fireEvent.change(screen.getByTestId('curve-exit-input'), {
+      target: { value: '5.5' },
+    })
+    fireEvent.click(screen.getByTestId('btn-save-curve'))
+    expect(screen.getByTestId('curve-result')).toBeDefined()
+    expect(screen.getByTestId('curve-result-radius').textContent).toContain(
+      '25',
+    )
+    expect(screen.getByTestId('curve-result-radius').textContent).toContain('m')
+    expect(screen.getByTestId('curve-result-angle').textContent).toContain('90')
+    expect(screen.getByTestId('curve-result-angle').textContent).toContain('°')
+    expect(screen.getByTestId('curve-result-entrance').textContent).toContain(
+      '6',
+    )
+    expect(screen.getByTestId('curve-result-entrance').textContent).toContain(
+      'm',
+    )
+    expect(screen.getByTestId('curve-result-exit').textContent).toContain('5.5')
+    expect(screen.getByTestId('curve-result-exit').textContent).toContain('m')
+  })
+
+  it('shows measurement object name in curve result', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    fireEvent.change(screen.getByTestId('curve-radius-input'), {
+      target: { value: '25' },
+    })
+    fireEvent.change(screen.getByTestId('curve-angle-input'), {
+      target: { value: '90' },
+    })
+    fireEvent.change(screen.getByTestId('curve-entrance-input'), {
+      target: { value: '6' },
+    })
+    fireEvent.change(screen.getByTestId('curve-exit-input'), {
+      target: { value: '5.5' },
+    })
+    fireEvent.click(screen.getByTestId('btn-save-curve'))
+    expect(screen.getByTestId('curve-result-object').textContent).toContain(
+      '弯道参数',
+    )
+  })
+
+  it('shows parameter source in curve result', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    fireEvent.change(screen.getByTestId('curve-radius-input'), {
+      target: { value: '25' },
+    })
+    fireEvent.change(screen.getByTestId('curve-angle-input'), {
+      target: { value: '90' },
+    })
+    fireEvent.change(screen.getByTestId('curve-entrance-input'), {
+      target: { value: '6' },
+    })
+    fireEvent.change(screen.getByTestId('curve-exit-input'), {
+      target: { value: '5.5' },
+    })
+    fireEvent.click(screen.getByTestId('btn-save-curve'))
+    expect(screen.getByTestId('curve-result-source').textContent).toContain(
+      '手动录入',
+    )
+  })
+
+  it('shows validation error for zero radius', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    fireEvent.change(screen.getByTestId('curve-radius-input'), {
+      target: { value: '0' },
+    })
+    fireEvent.change(screen.getByTestId('curve-angle-input'), {
+      target: { value: '90' },
+    })
+    fireEvent.change(screen.getByTestId('curve-entrance-input'), {
+      target: { value: '6' },
+    })
+    fireEvent.change(screen.getByTestId('curve-exit-input'), {
+      target: { value: '5.5' },
+    })
+    fireEvent.click(screen.getByTestId('btn-save-curve'))
+    expect(screen.getByTestId('curve-errors')).toBeDefined()
+    expect(screen.getByTestId('curve-errors').textContent).toContain('半径')
+  })
+
+  it('shows validation error for angle > 180', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    fireEvent.change(screen.getByTestId('curve-radius-input'), {
+      target: { value: '25' },
+    })
+    fireEvent.change(screen.getByTestId('curve-angle-input'), {
+      target: { value: '200' },
+    })
+    fireEvent.change(screen.getByTestId('curve-entrance-input'), {
+      target: { value: '6' },
+    })
+    fireEvent.change(screen.getByTestId('curve-exit-input'), {
+      target: { value: '5.5' },
+    })
+    fireEvent.click(screen.getByTestId('btn-save-curve'))
+    expect(screen.getByTestId('curve-errors')).toBeDefined()
+    expect(screen.getByTestId('curve-errors').textContent).toContain('夹角')
+  })
+
+  it('shows validation error for zero entrance width', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    fireEvent.change(screen.getByTestId('curve-radius-input'), {
+      target: { value: '25' },
+    })
+    fireEvent.change(screen.getByTestId('curve-angle-input'), {
+      target: { value: '90' },
+    })
+    fireEvent.change(screen.getByTestId('curve-entrance-input'), {
+      target: { value: '0' },
+    })
+    fireEvent.change(screen.getByTestId('curve-exit-input'), {
+      target: { value: '5.5' },
+    })
+    fireEvent.click(screen.getByTestId('btn-save-curve'))
+    expect(screen.getByTestId('curve-errors').textContent).toContain('入口宽度')
+  })
+
+  it('shows validation error for zero exit width', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    fireEvent.change(screen.getByTestId('curve-radius-input'), {
+      target: { value: '25' },
+    })
+    fireEvent.change(screen.getByTestId('curve-angle-input'), {
+      target: { value: '90' },
+    })
+    fireEvent.change(screen.getByTestId('curve-entrance-input'), {
+      target: { value: '6' },
+    })
+    fireEvent.change(screen.getByTestId('curve-exit-input'), {
+      target: { value: '0' },
+    })
+    fireEvent.click(screen.getByTestId('btn-save-curve'))
+    expect(screen.getByTestId('curve-errors').textContent).toContain('出口宽度')
+  })
+
+  it('curve measurement writes to draft store', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    fireEvent.change(screen.getByTestId('curve-radius-input'), {
+      target: { value: '25' },
+    })
+    fireEvent.change(screen.getByTestId('curve-angle-input'), {
+      target: { value: '90' },
+    })
+    fireEvent.change(screen.getByTestId('curve-entrance-input'), {
+      target: { value: '6' },
+    })
+    fireEvent.change(screen.getByTestId('curve-exit-input'), {
+      target: { value: '5.5' },
+    })
+    fireEvent.click(screen.getByTestId('btn-save-curve'))
+    const status = useRouteSurveyStore
+      .getState()
+      .getObstacleMeasurementStatus(SURVEY_ROUTES[0].id, curveObs.id)
+    expect(status).toBe('measured')
+  })
+
+  it('curve measurement persists after route switch', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    fireEvent.change(screen.getByTestId('curve-radius-input'), {
+      target: { value: '25' },
+    })
+    fireEvent.change(screen.getByTestId('curve-angle-input'), {
+      target: { value: '90' },
+    })
+    fireEvent.change(screen.getByTestId('curve-entrance-input'), {
+      target: { value: '6' },
+    })
+    fireEvent.change(screen.getByTestId('curve-exit-input'), {
+      target: { value: '5.5' },
+    })
+    fireEvent.click(screen.getByTestId('btn-save-curve'))
+    fireEvent.click(screen.getByTestId(`route-nav-${SURVEY_ROUTES[1].id}`))
+    fireEvent.click(screen.getByTestId(`route-nav-${SURVEY_ROUTES[0].id}`))
+    const status = useRouteSurveyStore
+      .getState()
+      .getObstacleMeasurementStatus(SURVEY_ROUTES[0].id, curveObs.id)
+    expect(status).toBe('measured')
+  })
+
+  it('can retake curve measurement', () => {
+    render(<RouteSurveyPage />)
+    const curveObs = SURVEY_ROUTES[0].obstacles.find((o) => o.type === 'curve')!
+    fireEvent.click(screen.getByTestId(`obstacle-item-${curveObs.id}`))
+    const targetButtons = screen.getAllByTestId(/^target-/)
+    fireEvent.click(
+      targetButtons.find((b) => b.textContent?.includes('弯道参数'))!,
+    )
+    fireEvent.change(screen.getByTestId('curve-radius-input'), {
+      target: { value: '25' },
+    })
+    fireEvent.change(screen.getByTestId('curve-angle-input'), {
+      target: { value: '90' },
+    })
+    fireEvent.change(screen.getByTestId('curve-entrance-input'), {
+      target: { value: '6' },
+    })
+    fireEvent.change(screen.getByTestId('curve-exit-input'), {
+      target: { value: '5.5' },
+    })
+    fireEvent.click(screen.getByTestId('btn-save-curve'))
+    fireEvent.click(screen.getByTestId('btn-retake-curve'))
+    expect(screen.queryByTestId('curve-result')).toBeNull()
+  })
+
+  it('does not implement Day62 bridge load input form', () => {
+    render(<RouteSurveyPage />)
+    expect(screen.queryByTestId('bridge-load-input')).toBeNull()
+    expect(screen.queryByTestId('bridge-info-panel')).toBeNull()
+  })
+
+  it('does not implement curve passability rule engine', () => {
+    render(<RouteSurveyPage />)
+    expect(screen.queryByTestId('curve-passability-result')).toBeNull()
+    expect(screen.queryByTestId('curve-passability-judgment')).toBeNull()
+  })
+
+  it('displays Day61 scope in teaching note', () => {
+    render(<RouteSurveyPage />)
+    expect(screen.getByText(/Day61 已实现弯道参数测量/)).toBeDefined()
+  })
 })

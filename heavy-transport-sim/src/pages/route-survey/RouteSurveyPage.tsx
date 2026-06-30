@@ -13,6 +13,12 @@ import {
   calculateVerticalDistance,
   calculateSlopePercent,
   calculateSlopeAngleDeg,
+  CURVE_OBSTACLE_KIND_LABELS,
+  CURVE_MEASUREMENT_SOURCE_LABELS,
+  createCurveParameterResult,
+  type CurveObstacleKind,
+  type CurveMeasurementSource,
+  type CurveParameterMeasurementResult,
 } from '../../domain/measurements'
 import { useRouteSurveyStore } from '../../stores/route-survey/routeSurveyStore'
 
@@ -71,7 +77,8 @@ export default function RouteSurveyPage() {
 
       <div style={noteStyle}>
         <strong>说明：</strong>
-        Day58 实现路线切换、导航和障碍列表。测量工具将在 Day59—Day62 逐步实现。
+        Day58 实现路线切换、导航和障碍列表。Day59 实现距离/高度测量，Day60
+        实现坡度测量，Day61 实现弯道参数测量。
       </div>
 
       {!validation.success && (
@@ -187,9 +194,12 @@ export default function RouteSurveyPage() {
 
       <div style={teachingNoteStyle}>
         <strong>教学简化声明：</strong>
-        本路线和障碍点数据为教学简化配置，不代表真实工程路线。 Day59
-        已实现距离/高度测量工具，Day60 已实现坡度测量。弯道、桥梁测量将在
-        Day61—Day62 实现。
+        本路线和障碍点数据为教学简化配置，不代表真实工程路线。Day59
+        已实现距离/高度测量工具，Day60 已实现坡度测量，Day61
+        已实现弯道参数测量（半径、夹角、入口/出口宽度）。
+        桥梁信息查看和限载输入将在 Day62 实现。弯道通过性规则（圆弧弯道
+        Day65、直交弯道 Day66）将在后续实现。
+        本系统不做弯道是否可通过的最终判定。
       </div>
     </div>
   )
@@ -433,6 +443,75 @@ const teachingNoteStyle: React.CSSProperties = {
   fontSize: '12px',
 }
 
+const formLabelStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2px',
+  fontSize: '12px',
+  fontWeight: 500,
+  color: '#333',
+}
+
+const formInputStyle: React.CSSProperties = {
+  padding: '6px 8px',
+  border: '1px solid #d0d7de',
+  borderRadius: '4px',
+  fontSize: '13px',
+  marginTop: '2px',
+}
+
+const curveErrorStyle: React.CSSProperties = {
+  padding: '8px',
+  background: '#ffebee',
+  borderRadius: '4px',
+  fontSize: '12px',
+  color: '#c62828',
+  marginTop: '8px',
+}
+
+const saveBtnStyle: React.CSSProperties = {
+  padding: '6px 16px',
+  border: '1px solid #1976d2',
+  borderRadius: '4px',
+  background: '#1976d2',
+  color: '#fff',
+  cursor: 'pointer',
+  fontSize: '12px',
+  fontWeight: 'bold',
+}
+
+const clearBtnStyle: React.CSSProperties = {
+  padding: '6px 16px',
+  border: '1px solid #d0d7de',
+  borderRadius: '4px',
+  background: '#fff',
+  cursor: 'pointer',
+  fontSize: '12px',
+}
+
+const curveResultBoxStyle: React.CSSProperties = {
+  padding: '12px',
+  background: '#e8f5e9',
+  borderRadius: '6px',
+  marginTop: '12px',
+}
+
+const curveParamRowStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  fontSize: '13px',
+  padding: '2px 0',
+}
+
+const curveParamLabelStyle: React.CSSProperties = {
+  color: '#555',
+}
+
+const curveParamValueStyle: React.CSSProperties = {
+  fontWeight: 'bold',
+  color: '#2e7d32',
+}
+
 function MeasurementPanel({
   routeId,
   obstacle,
@@ -460,12 +539,53 @@ function MeasurementPanel({
     slopeAngle?: number
   } | null>(null)
 
+  const [curveResult, setCurveResult] =
+    useState<CurveParameterMeasurementResult | null>(null)
+  const [curveForm, setCurveForm] = useState<{
+    curveKind: CurveObstacleKind
+    radiusM: string
+    angleDeg: string
+    entranceWidthM: string
+    exitWidthM: string
+    effectiveWidthM: string
+    source: CurveMeasurementSource
+    notes: string
+  }>({
+    curveKind: 'circular_curve',
+    radiusM: '',
+    angleDeg: '',
+    entranceWidthM: '',
+    exitWidthM: '',
+    effectiveWidthM: '',
+    source: 'manual_input',
+    notes: '',
+  })
+  const [curveErrors, setCurveErrors] = useState<string[]>([])
+
   const activeTarget = targets.find((t) => t.id === activeTargetId) ?? null
 
   const handleTargetSelect = (targetId: string) => {
     setActiveTargetId(targetId)
     setSelectedPairIndex(null)
     setMeasurementResult(null)
+    setCurveResult(null)
+    setCurveErrors([])
+    const tgt = targets.find((t) => t.id === targetId)
+    if (tgt?.curveKind) {
+      const preset = tgt.presetCurveParams
+      setCurveForm({
+        curveKind: tgt.curveKind,
+        radiusM: preset?.radiusM ? String(preset.radiusM) : '',
+        angleDeg: preset?.angleDeg ? String(preset.angleDeg) : '',
+        entranceWidthM: preset?.entranceWidthM
+          ? String(preset.entranceWidthM)
+          : '',
+        exitWidthM: preset?.exitWidthM ? String(preset.exitWidthM) : '',
+        effectiveWidthM: '',
+        source: preset?.radiusM ? 'teaching_config' : 'manual_input',
+        notes: '',
+      })
+    }
   }
 
   const handlePresetSelect = (pairIndex: number) => {
@@ -541,6 +661,56 @@ function MeasurementPanel({
     setActiveTargetId(null)
     setSelectedPairIndex(null)
     setMeasurementResult(null)
+    setCurveResult(null)
+    setCurveErrors([])
+  }
+
+  const handleCurveSave = () => {
+    if (!activeTarget) return
+    const errs: string[] = []
+    const radius = parseFloat(curveForm.radiusM)
+    const angle = parseFloat(curveForm.angleDeg)
+    const entrance = parseFloat(curveForm.entranceWidthM)
+    const exit = parseFloat(curveForm.exitWidthM)
+    if (isNaN(radius) || radius <= 0) errs.push('半径必须大于 0')
+    if (isNaN(angle) || angle <= 0 || angle > 180)
+      errs.push('夹角必须大于 0 且小于等于 180')
+    if (isNaN(entrance) || entrance <= 0) errs.push('入口宽度必须大于 0')
+    if (isNaN(exit) || exit <= 0) errs.push('出口宽度必须大于 0')
+    if (errs.length > 0) {
+      setCurveErrors(errs)
+      return
+    }
+    setCurveErrors([])
+    const result = createCurveParameterResult({
+      routeId,
+      obstacleId: obstacle.id,
+      targetId: activeTarget.id,
+      targetLabel: activeTarget.label,
+      curveKind: curveForm.curveKind,
+      radiusM: radius,
+      angleDeg: angle,
+      entranceWidthM: entrance,
+      exitWidthM: exit,
+      effectiveWidthM: curveForm.effectiveWidthM
+        ? parseFloat(curveForm.effectiveWidthM)
+        : undefined,
+      source: curveForm.source,
+      notes: curveForm.notes || undefined,
+    })
+    if ('error' in result) {
+      setCurveErrors([result.error])
+      return
+    }
+    setCurveResult(result)
+    useRouteSurveyStore.getState().upsertMeasurementDraft({
+      routeId,
+      obstacleId: obstacle.id,
+      measurementType: 'curve',
+      status: 'measured',
+      valueSummary: result.valueLabel,
+      updatedAt: result.measuredAt,
+    })
   }
 
   if (targets.length === 0) {
@@ -600,7 +770,23 @@ function MeasurementPanel({
           <div style={{ fontSize: '13px', color: '#555' }}>
             {activeTarget.description}
           </div>
-          {activeTarget.suggestedPointPairs &&
+          {activeTarget.supportedTools.includes('curve') &&
+          activeTarget.curveKind ? (
+            <div style={{ marginTop: '12px' }}>
+              <CurveParameterForm
+                form={curveForm}
+                onChange={setCurveForm}
+                errors={curveErrors}
+                onSave={handleCurveSave}
+                result={curveResult}
+                onClear={() => {
+                  setCurveResult(null)
+                  setCurveErrors([])
+                }}
+              />
+            </div>
+          ) : (
+            activeTarget.suggestedPointPairs &&
             activeTarget.suggestedPointPairs.length > 0 && (
               <div style={{ marginTop: '8px' }}>
                 <strong style={{ fontSize: '12px' }}>预设测量点：</strong>
@@ -635,7 +821,8 @@ function MeasurementPanel({
                   ))}
                 </div>
               </div>
-            )}
+            )
+          )}
         </div>
       )}
 
@@ -735,6 +922,249 @@ function MeasurementPanel({
         >
           清除测量
         </button>
+      )}
+    </div>
+  )
+}
+
+function CurveParameterForm({
+  form,
+  onChange,
+  errors,
+  onSave,
+  result,
+  onClear,
+}: {
+  form: {
+    curveKind: CurveObstacleKind
+    radiusM: string
+    angleDeg: string
+    entranceWidthM: string
+    exitWidthM: string
+    effectiveWidthM: string
+    source: CurveMeasurementSource
+    notes: string
+  }
+  onChange: (f: typeof form) => void
+  errors: string[]
+  onSave: () => void
+  result: CurveParameterMeasurementResult | null
+  onClear: () => void
+}) {
+  return (
+    <div data-testid="curve-parameter-form">
+      <div style={{ marginBottom: '8px' }}>
+        <strong style={{ fontSize: '12px' }}>弯道类型：</strong>
+        <span
+          data-testid="curve-kind"
+          style={{ fontSize: '13px', marginLeft: '4px' }}
+        >
+          {CURVE_OBSTACLE_KIND_LABELS[form.curveKind] ?? form.curveKind}
+        </span>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '8px',
+          marginBottom: '8px',
+        }}
+      >
+        <label style={formLabelStyle}>
+          <span>半径 (m) *</span>
+          <input
+            data-testid="curve-radius-input"
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={form.radiusM}
+            onChange={(e) => onChange({ ...form, radiusM: e.target.value })}
+            style={formInputStyle}
+            placeholder="弯道半径"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>夹角 (°) *</span>
+          <input
+            data-testid="curve-angle-input"
+            type="number"
+            step="0.01"
+            min="0.01"
+            max="180"
+            value={form.angleDeg}
+            onChange={(e) => onChange({ ...form, angleDeg: e.target.value })}
+            style={formInputStyle}
+            placeholder="弯道夹角"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>入口宽度 (m) *</span>
+          <input
+            data-testid="curve-entrance-input"
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={form.entranceWidthM}
+            onChange={(e) =>
+              onChange({ ...form, entranceWidthM: e.target.value })
+            }
+            style={formInputStyle}
+            placeholder="入口路面宽度"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>出口宽度 (m) *</span>
+          <input
+            data-testid="curve-exit-input"
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={form.exitWidthM}
+            onChange={(e) => onChange({ ...form, exitWidthM: e.target.value })}
+            style={formInputStyle}
+            placeholder="出口路面宽度"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>有效宽度 (m)</span>
+          <input
+            data-testid="curve-effective-input"
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.effectiveWidthM}
+            onChange={(e) =>
+              onChange({ ...form, effectiveWidthM: e.target.value })
+            }
+            style={formInputStyle}
+            placeholder="可选"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>参数来源</span>
+          <select
+            data-testid="curve-source-select"
+            value={form.source}
+            onChange={(e) =>
+              onChange({
+                ...form,
+                source: e.target.value as CurveMeasurementSource,
+              })
+            }
+            style={formInputStyle}
+          >
+            <option value="manual_input">手动录入</option>
+            <option value="preset_point_pair">预设点位计算</option>
+            <option value="teaching_config">教学配置</option>
+          </select>
+        </label>
+      </div>
+
+      <label
+        style={{ ...formLabelStyle, marginBottom: '8px', display: 'block' }}
+      >
+        <span>备注</span>
+        <textarea
+          data-testid="curve-notes-input"
+          value={form.notes}
+          onChange={(e) => onChange({ ...form, notes: e.target.value })}
+          style={{
+            ...formInputStyle,
+            width: '100%',
+            minHeight: '48px',
+            resize: 'vertical',
+          }}
+          placeholder="可选备注"
+        />
+      </label>
+
+      {errors.length > 0 && (
+        <div data-testid="curve-errors" style={curveErrorStyle}>
+          {errors.map((e, i) => (
+            <div key={i}>{e}</div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+        <button
+          data-testid="btn-save-curve"
+          onClick={onSave}
+          style={saveBtnStyle}
+        >
+          保存弯道参数
+        </button>
+        {result && (
+          <button
+            data-testid="btn-retake-curve"
+            onClick={onClear}
+            style={clearBtnStyle}
+          >
+            重测
+          </button>
+        )}
+      </div>
+
+      {result && (
+        <div data-testid="curve-result" style={curveResultBoxStyle}>
+          <div
+            style={{
+              fontWeight: 'bold',
+              fontSize: '14px',
+              marginBottom: '4px',
+            }}
+          >
+            弯道参数测量结果
+          </div>
+          <div data-testid="curve-result-radius" style={curveParamRowStyle}>
+            <span style={curveParamLabelStyle}>半径：</span>
+            <span style={curveParamValueStyle}>{result.radiusM} m</span>
+          </div>
+          <div data-testid="curve-result-angle" style={curveParamRowStyle}>
+            <span style={curveParamLabelStyle}>夹角：</span>
+            <span style={curveParamValueStyle}>{result.angleDeg}°</span>
+          </div>
+          <div data-testid="curve-result-entrance" style={curveParamRowStyle}>
+            <span style={curveParamLabelStyle}>入口宽度：</span>
+            <span style={curveParamValueStyle}>{result.entranceWidthM} m</span>
+          </div>
+          <div data-testid="curve-result-exit" style={curveParamRowStyle}>
+            <span style={curveParamLabelStyle}>出口宽度：</span>
+            <span style={curveParamValueStyle}>{result.exitWidthM} m</span>
+          </div>
+          {result.effectiveWidthM !== undefined && (
+            <div
+              data-testid="curve-result-effective"
+              style={curveParamRowStyle}
+            >
+              <span style={curveParamLabelStyle}>有效宽度：</span>
+              <span style={curveParamValueStyle}>
+                {result.effectiveWidthM} m
+              </span>
+            </div>
+          )}
+          <div
+            data-testid="curve-result-object"
+            style={{ fontSize: '13px', marginTop: '8px' }}
+          >
+            测量对象：{result.targetLabel}
+          </div>
+          <div
+            data-testid="curve-result-source"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            参数来源：
+            {CURVE_MEASUREMENT_SOURCE_LABELS[result.source] ?? result.source}
+          </div>
+          <div
+            data-testid="curve-result-kind"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            弯道类型：
+            {CURVE_OBSTACLE_KIND_LABELS[result.curveKind] ?? result.curveKind}
+          </div>
+        </div>
       )}
     </div>
   )
