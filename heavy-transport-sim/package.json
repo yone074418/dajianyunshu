@@ -20,7 +20,8 @@
     "verify:g3": "node scripts/verify-g3-3d-foundation.mjs",
     "verify:week7": "node scripts/verify-week7-first-stage-flow.mjs",
     "verify:week8": "node scripts/verify-week8-simple-configuration.mjs",
-    "verify:week9": "node scripts/verify-week9-route-survey-tools.mjs"
+    "verify:week9": "node scripts/verify-week9-route-survey-tools.mjs",
+    "verify:g4": "node scripts/verify-g4-first-three-stages.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",
