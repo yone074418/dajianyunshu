@@ -43,6 +43,12 @@ import {
   type CircularCurveClearanceInput,
   type CircularCurveClearanceResult,
 } from '../../domain/circularCurveClearance'
+import {
+  evaluateBridgeBearing,
+  type BridgeBearingInput,
+  type BridgeBearingRuleResult,
+  TEACHING_SIMPLIFICATION_NOTICE,
+} from '../../domain/bridgeBearing'
 import { useRouteSurveyStore } from '../../stores/route-survey/routeSurveyStore'
 
 export default function RouteSurveyPage() {
@@ -234,6 +240,19 @@ export default function RouteSurveyPage() {
         >
           <h2>圆弧弯道通过性检查</h2>
           <CircularCurvePanel
+            routeId={currentRouteId}
+            obstacle={selectedObstacle}
+          />
+        </section>
+      )}
+
+      {selectedObstacle && selectedObstacle.type === 'bridge' && (
+        <section
+          data-testid="bridge-bearing-section"
+          style={{ marginTop: '20px' }}
+        >
+          <h2>桥梁承载教学检查</h2>
+          <BridgeBearingPanel
             routeId={currentRouteId}
             obstacle={selectedObstacle}
           />
@@ -2059,6 +2078,212 @@ function CircularCurvePanel({
               width margin: {result.widthMarginM.toFixed(2)} m
             </div>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BridgeBearingPanel({
+  routeId,
+  obstacle,
+}: {
+  routeId: string
+  obstacle: RouteObstacle
+}) {
+  const [bridgeName, setBridgeName] = useState(obstacle.name)
+  const [loadLimitT, setLoadLimitT] = useState('')
+  const [totalMassT, setTotalMassT] = useState('180')
+  const [axleLines, setAxleLines] = useState('12')
+  const [singleAxleLineLimitT, setSingleAxleLineLimitT] = useState('18')
+  const [safetyFactor, setSafetyFactor] = useState('1.1')
+  const [result, setResult] = useState<BridgeBearingRuleResult | null>(null)
+
+  const handleEvaluate = () => {
+    const input: BridgeBearingInput = {
+      routeId,
+      obstacleId: obstacle.id,
+      obstacleName: obstacle.name,
+      bridge: {
+        bridgeName,
+        loadLimitT: parseRequiredNumber(loadLimitT),
+        singleAxleLineLimitT: parseOptionalNumber(singleAxleLineLimitT),
+      },
+      vehicle: {
+        totalMassT: parseRequiredNumber(totalMassT),
+        axleLines: parseInt(axleLines) || 0,
+      },
+      safetyFactor: parseOptionalNumber(safetyFactor),
+      measurementSource: 'manual_input',
+    }
+    setResult(evaluateBridgeBearing(input))
+  }
+
+  return (
+    <div data-testid="bridge-bearing-panel" style={rulePanelStyle}>
+      <div style={ruleGridStyle}>
+        <label style={formLabelStyle}>
+          <span>桥梁名称</span>
+          <input
+            data-testid="bearing-bridge-name-input"
+            type="text"
+            value={bridgeName}
+            onChange={(e) => setBridgeName(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>桥梁限载 (t)</span>
+          <input
+            data-testid="bearing-load-limit-input"
+            type="number"
+            step="0.01"
+            value={loadLimitT}
+            onChange={(e) => setLoadLimitT(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>运输总质量 (t)</span>
+          <input
+            data-testid="bearing-total-mass-input"
+            type="number"
+            step="0.01"
+            value={totalMassT}
+            onChange={(e) => setTotalMassT(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>轴线数</span>
+          <input
+            data-testid="bearing-axle-lines-input"
+            type="number"
+            step="1"
+            value={axleLines}
+            onChange={(e) => setAxleLines(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>教学单轴线限值 (t)</span>
+          <input
+            data-testid="bearing-single-axle-limit-input"
+            type="number"
+            step="0.01"
+            value={singleAxleLineLimitT}
+            onChange={(e) => setSingleAxleLineLimitT(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>安全系数</span>
+          <input
+            data-testid="bearing-safety-factor-input"
+            type="number"
+            step="0.01"
+            value={safetyFactor}
+            onChange={(e) => setSafetyFactor(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+      </div>
+      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+        <button
+          data-testid="btn-evaluate-bearing"
+          onClick={handleEvaluate}
+          style={saveBtnStyle}
+        >
+          检查桥梁承载
+        </button>
+        {result && (
+          <button
+            data-testid="btn-clear-bearing-rule"
+            onClick={() => setResult(null)}
+            style={clearBtnStyle}
+          >
+            清除
+          </button>
+        )}
+      </div>
+      {result && (
+        <div data-testid="bridge-bearing-result" style={ruleResultStyle}>
+          <div
+            data-testid="bearing-teaching-notice"
+            style={{
+              padding: '8px',
+              background: '#fff3e0',
+              borderRadius: '4px',
+              fontSize: '12px',
+              marginBottom: '8px',
+              fontWeight: 'bold',
+            }}
+          >
+            {TEACHING_SIMPLIFICATION_NOTICE}
+          </div>
+          <div data-testid="bearing-status">
+            状态:{' '}
+            {result.status === 'pass'
+              ? '通过'
+              : result.status === 'pass_with_warning'
+                ? '边界通过'
+                : result.status === 'fail'
+                  ? '不通过'
+                  : '缺参数'}
+          </div>
+          <div data-testid="bearing-summary">{result.summary}</div>
+          {result.loadLimitT !== undefined && (
+            <div data-testid="bearing-load-limit-value">
+              桥梁限载: {result.loadLimitT.toFixed(2)} t
+            </div>
+          )}
+          {result.totalMassT !== undefined && (
+            <div data-testid="bearing-total-mass-value">
+              运输总质量: {result.totalMassT.toFixed(2)} t
+            </div>
+          )}
+          {result.averageAxleLineLoadT !== undefined && (
+            <div data-testid="bearing-axle-load-value">
+              平均单轴线载荷: {result.averageAxleLineLoadT.toFixed(2)} t/轴线
+            </div>
+          )}
+          {result.singleAxleLineLimitT !== undefined && (
+            <div data-testid="bearing-axle-limit-value">
+              教学单轴线限值: {result.singleAxleLineLimitT.toFixed(2)} t/轴线
+            </div>
+          )}
+          {result.totalLoadMarginT !== undefined && (
+            <div data-testid="bearing-total-margin">
+              总质量余量: {result.totalLoadMarginT.toFixed(2)} t
+            </div>
+          )}
+          {result.axleLoadMarginT !== undefined && (
+            <div data-testid="bearing-axle-margin">
+              轴线载荷余量: {result.axleLoadMarginT.toFixed(2)} t
+            </div>
+          )}
+          {result.calculationProcess.length > 0 && (
+            <div
+              data-testid="bearing-calculation-process"
+              style={{
+                fontSize: '12px',
+                color: '#1565c0',
+                marginTop: '8px',
+                whiteSpace: 'pre-line',
+                background: '#f5f5f5',
+                padding: '8px',
+                borderRadius: '4px',
+              }}
+            >
+              {result.calculationProcess.join('\n')}
+            </div>
+          )}
+          <div
+            data-testid="bearing-next-action"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            建议：{result.nextAction}
+          </div>
         </div>
       )}
     </div>
