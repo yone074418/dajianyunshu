@@ -43,6 +43,11 @@ import {
   type CircularCurveClearanceInput,
   type CircularCurveClearanceResult,
 } from '../../domain/circularCurveClearance'
+import {
+  evaluateSlopeTraction,
+  type SlopeTractionInput,
+  type SlopeTractionRuleResult,
+} from '../../domain/slopeTraction'
 import { useRouteSurveyStore } from '../../stores/route-survey/routeSurveyStore'
 
 export default function RouteSurveyPage() {
@@ -234,6 +239,19 @@ export default function RouteSurveyPage() {
         >
           <h2>圆弧弯道通过性检查</h2>
           <CircularCurvePanel
+            routeId={currentRouteId}
+            obstacle={selectedObstacle}
+          />
+        </section>
+      )}
+
+      {selectedObstacle && selectedObstacle.type === 'slope' && (
+        <section
+          data-testid="slope-traction-section"
+          style={{ marginTop: '20px' }}
+        >
+          <h2>坡道牵引力检查</h2>
+          <SlopeTractionPanel
             routeId={currentRouteId}
             obstacle={selectedObstacle}
           />
@@ -2059,6 +2077,214 @@ function CircularCurvePanel({
               width margin: {result.widthMarginM.toFixed(2)} m
             </div>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SlopeTractionPanel({
+  routeId,
+  obstacle,
+}: {
+  routeId: string
+  obstacle: RouteObstacle
+}) {
+  const [slopePercent, setSlopePercent] = useState('')
+  const [totalMassT, setTotalMassT] = useState('200')
+  const [tractorCount, setTractorCount] = useState('2')
+  const [tractionForce, setTractionForce] = useState('300')
+  const [efficiency, setEfficiency] = useState('0.85')
+  const [rollingCoeff, setRollingCoeff] = useState('0.015')
+  const [safetyFactor, setSafetyFactor] = useState('1.1')
+  const [result, setResult] = useState<SlopeTractionRuleResult | null>(null)
+
+  const handleEvaluate = () => {
+    const input: SlopeTractionInput = {
+      routeId,
+      obstacleId: obstacle.id,
+      obstacleName: obstacle.name,
+      slope: {
+        slopePercent: parseOptionalNumber(slopePercent),
+      },
+      vehicle: {
+        totalMassT: parseRequiredNumber(totalMassT),
+        tractorCount: parseInt(tractorCount) || 0,
+        tractionForcePerTractorKN: parseRequiredNumber(tractionForce),
+        drivetrainEfficiency: parseOptionalNumber(efficiency),
+        rollingResistanceCoefficient: parseOptionalNumber(rollingCoeff),
+      },
+      safetyFactor: parseOptionalNumber(safetyFactor),
+      measurementSource: 'manual_input',
+    }
+    setResult(evaluateSlopeTraction(input))
+  }
+
+  return (
+    <div data-testid="slope-traction-panel" style={rulePanelStyle}>
+      <div style={ruleGridStyle}>
+        <label style={formLabelStyle}>
+          <span>坡度 (%)</span>
+          <input
+            data-testid="slope-percent-input"
+            type="number"
+            step="0.01"
+            value={slopePercent}
+            onChange={(e) => setSlopePercent(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>总质量 (t)</span>
+          <input
+            data-testid="slope-total-mass"
+            type="number"
+            step="0.01"
+            value={totalMassT}
+            onChange={(e) => setTotalMassT(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>牵引车数量</span>
+          <input
+            data-testid="slope-tractor-count"
+            type="number"
+            step="1"
+            value={tractorCount}
+            onChange={(e) => setTractorCount(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>单车牵引力 (kN)</span>
+          <input
+            data-testid="slope-traction-force"
+            type="number"
+            step="0.01"
+            value={tractionForce}
+            onChange={(e) => setTractionForce(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>传动效率</span>
+          <input
+            data-testid="slope-efficiency"
+            type="number"
+            step="0.01"
+            value={efficiency}
+            onChange={(e) => setEfficiency(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>滚动阻力系数</span>
+          <input
+            data-testid="slope-rolling-coeff"
+            type="number"
+            step="0.001"
+            value={rollingCoeff}
+            onChange={(e) => setRollingCoeff(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>安全系数</span>
+          <input
+            data-testid="slope-safety-factor"
+            type="number"
+            step="0.01"
+            value={safetyFactor}
+            onChange={(e) => setSafetyFactor(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+      </div>
+      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+        <button
+          data-testid="btn-evaluate-slope"
+          onClick={handleEvaluate}
+          style={saveBtnStyle}
+        >
+          检查牵引力
+        </button>
+        {result && (
+          <button
+            data-testid="btn-clear-slope-rule"
+            onClick={() => setResult(null)}
+            style={clearBtnStyle}
+          >
+            清除
+          </button>
+        )}
+      </div>
+      {result && (
+        <div data-testid="slope-traction-result" style={ruleResultStyle}>
+          <div data-testid="slope-traction-status">
+            状态:{' '}
+            {result.status === 'pass'
+              ? '满足'
+              : result.status === 'pass_with_warning'
+                ? '边界满足'
+                : result.status === 'fail'
+                  ? '不满足'
+                  : '缺参数'}
+          </div>
+          <div data-testid="slope-traction-summary">{result.summary}</div>
+          {result.effectiveTractionKN !== undefined && (
+            <div data-testid="slope-effective-traction">
+              有效牵引力: {result.effectiveTractionKN.toFixed(2)} kN
+            </div>
+          )}
+          {result.gradeResistanceKN !== undefined && (
+            <div data-testid="slope-grade-resistance">
+              坡道阻力: {result.gradeResistanceKN.toFixed(2)} kN
+            </div>
+          )}
+          {result.rollingResistanceKN !== undefined && (
+            <div data-testid="slope-rolling-resistance">
+              滚动阻力: {result.rollingResistanceKN.toFixed(2)} kN
+            </div>
+          )}
+          {result.totalResistanceKN !== undefined && (
+            <div data-testid="slope-total-resistance">
+              总阻力: {result.totalResistanceKN.toFixed(2)} kN
+            </div>
+          )}
+          {result.tractionMarginKN !== undefined && (
+            <div data-testid="slope-traction-margin">
+              牵引力余量: {result.tractionMarginKN.toFixed(2)} kN
+            </div>
+          )}
+          {result.calculationProcess.length > 0 && (
+            <div
+              data-testid="slope-calculation-process"
+              style={{
+                fontSize: '12px',
+                color: '#1565c0',
+                marginTop: '8px',
+                whiteSpace: 'pre-line',
+                background: '#f5f5f5',
+                padding: '8px',
+                borderRadius: '4px',
+              }}
+            >
+              {result.calculationProcess.join('\n')}
+            </div>
+          )}
+          <div
+            data-testid="slope-teaching-note"
+            style={{ fontSize: '12px', color: '#1565c0', marginTop: '8px' }}
+          >
+            {result.teachingNote}
+          </div>
+          <div
+            data-testid="slope-next-action"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            建议：{result.nextAction}
+          </div>
         </div>
       )}
     </div>
