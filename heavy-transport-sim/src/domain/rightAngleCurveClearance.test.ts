@@ -320,9 +320,7 @@ describe('evaluateRightAngleCurveClearance', () => {
       ...baseInput,
       curve: curveWithoutCorner,
     })
-    const cornerCheck = r.checks.find(
-      (c) => c.checkId === 'corner_width_check',
-    )
+    const cornerCheck = r.checks.find((c) => c.checkId === 'corner_width_check')
     expect(cornerCheck).toBeUndefined()
   })
 
