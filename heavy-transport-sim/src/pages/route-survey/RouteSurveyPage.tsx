@@ -67,6 +67,10 @@ import {
   type RouteRecommendationResult,
   TEACHING_NOTE,
 } from '../../domain/routeRecommendation'
+import {
+  mapRouteConclusionToAdjustmentRequirements,
+  TEACHING_NOTE as VEHICLE_ADJUSTMENT_TEACHING_NOTE,
+} from '../../domain/vehicleAdjustmentRequirement'
 import { useRouteSurveyStore } from '../../stores/route-survey/routeSurveyStore'
 
 export default function RouteSurveyPage() {
@@ -309,6 +313,14 @@ export default function RouteSurveyPage() {
       >
         <h2>路线建议汇总</h2>
         <RouteRecommendationPanel routes={routes} />
+      </section>
+
+      <section
+        data-testid="vehicle-adjustment-requirement-section"
+        style={{ marginTop: '20px' }}
+      >
+        <h2>车组调整要求</h2>
+        <VehicleAdjustmentRequirementPanel routes={routes} />
       </section>
 
       <div style={teachingNoteStyle}>
@@ -2896,6 +2908,239 @@ function RouteRecommendationPanel({ routes }: { routes: SurveyRoute[] }) {
               style={{ fontSize: '12px', color: '#1565c0' }}
             >
               下一步：{rec.nextAction}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function VehicleAdjustmentRequirementPanel({
+  routes,
+}: {
+  routes: SurveyRoute[]
+}) {
+  const summaries = useMemo(() => {
+    const results: RouteRecommendationResult[] = routes.map((route) => {
+      const obstacleSummaries: ObstacleConclusionSummary[] =
+        route.obstacles.map((obs) => createNotCheckedSummary(route.id, obs))
+      return buildRouteRecommendation(route, obstacleSummaries)
+    })
+    return results.map(mapRouteConclusionToAdjustmentRequirements)
+  }, [routes])
+
+  const categoryLabels: Record<string, string> = {
+    height_clearance: '高度通过',
+    slope_traction: '坡道牵引力',
+    axle_load_distribution: '轴载分布',
+    route_selection: '路线选择',
+    data_completion: '数据补充',
+    teaching_review: '教学复习',
+  }
+
+  const categoryColors: Record<string, string> = {
+    height_clearance: '#1565c0',
+    slope_traction: '#f57c00',
+    axle_load_distribution: '#d32f2f',
+    route_selection: '#2e7d32',
+    data_completion: '#757575',
+    teaching_review: '#9c27b0',
+  }
+
+  const statusLabels: Record<string, string> = {
+    required: '必须调整',
+    recommended: '建议调整',
+    blocked: '需补充数据',
+    not_applicable: '不适用',
+  }
+
+  const statusColors: Record<string, string> = {
+    required: '#d32f2f',
+    recommended: '#f57c00',
+    blocked: '#757575',
+    not_applicable: '#bdbdbd',
+  }
+
+  return (
+    <div data-testid="vehicle-adjustment-panel" style={rulePanelStyle}>
+      <div
+        data-testid="vehicle-adjustment-teaching-note"
+        style={{
+          padding: '8px',
+          background: '#fff3e0',
+          borderRadius: '4px',
+          fontSize: '12px',
+          marginBottom: '12px',
+          fontWeight: 'bold',
+        }}
+      >
+        {VEHICLE_ADJUSTMENT_TEACHING_NOTE}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {summaries.map((summary) => (
+          <div
+            key={summary.routeId}
+            data-testid={`vehicle-adjustment-${summary.routeId}`}
+            style={{
+              padding: '12px',
+              border: '1px solid #e0e0e0',
+              borderRadius: '8px',
+              background: '#fff',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px',
+              }}
+            >
+              <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+                {summary.routeName}
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '8px',
+                  fontSize: '12px',
+                }}
+              >
+                <span style={{ color: '#d32f2f' }}>
+                  必须: {summary.requiredCount}
+                </span>
+                <span style={{ color: '#f57c00' }}>
+                  建议: {summary.recommendedCount}
+                </span>
+                <span style={{ color: '#757575' }}>
+                  待补充: {summary.blockedCount}
+                </span>
+              </div>
+            </div>
+            <div
+              data-testid={`vehicle-adjustment-summary-${summary.routeId}`}
+              style={{ fontSize: '13px', marginBottom: '8px' }}
+            >
+              {summary.summary}
+            </div>
+            {summary.requirements.length > 0 ? (
+              <div style={{ marginBottom: '8px' }}>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    marginBottom: '4px',
+                  }}
+                >
+                  调整要求清单：
+                </div>
+                {summary.requirements.map((req) => (
+                  <div
+                    key={req.id}
+                    data-testid={`adjustment-requirement-${req.id}`}
+                    style={{
+                      padding: '8px',
+                      marginLeft: '8px',
+                      marginBottom: '6px',
+                      borderLeft: `3px solid ${categoryColors[req.category]}`,
+                      fontSize: '12px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <div style={{ fontWeight: 'bold' }}>{req.title}</div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '6px',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span
+                          style={{
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: categoryColors[req.category],
+                            color: '#fff',
+                            fontSize: '11px',
+                          }}
+                        >
+                          {categoryLabels[req.category]}
+                        </span>
+                        <span
+                          data-testid={`requirement-status-${req.id}`}
+                          style={{
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: statusColors[req.status],
+                            color: '#fff',
+                            fontSize: '11px',
+                          }}
+                        >
+                          {statusLabels[req.status]}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ color: '#666', marginTop: '4px' }}>
+                      来源: {req.obstacleName} ({req.sourceRuleId})
+                    </div>
+                    <div style={{ color: '#666', marginTop: '2px' }}>
+                      原因: {req.reason}
+                    </div>
+                    <div style={{ color: '#1565c0', marginTop: '2px' }}>
+                      建议: {req.suggestedChange}
+                    </div>
+                    {req.nextStepDay && (
+                      <div
+                        data-testid={`requirement-next-day-${req.id}`}
+                        style={{
+                          color: '#9c27b0',
+                          marginTop: '2px',
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        后续处理: Day{req.nextStepDay}
+                      </div>
+                    )}
+                    {!req.enabledInDay71 && (
+                      <div
+                        style={{
+                          color: '#757575',
+                          marginTop: '2px',
+                          fontStyle: 'italic',
+                        }}
+                      >
+                        (Day71仅生成要求，不执行调整)
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                data-testid={`no-adjustment-${summary.routeId}`}
+                style={{
+                  padding: '8px',
+                  background: '#e8f5e9',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  color: '#2e7d32',
+                }}
+              >
+                暂无车组调整要求
+              </div>
+            )}
+            <div
+              data-testid={`vehicle-adjustment-next-action-${summary.routeId}`}
+              style={{ fontSize: '12px', color: '#1565c0' }}
+            >
+              下一步：{summary.nextAction}
             </div>
           </div>
         ))}
