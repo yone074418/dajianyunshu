@@ -67,6 +67,24 @@ import {
   type RouteRecommendationResult,
   TEACHING_NOTE,
 } from '../../domain/routeRecommendation'
+import {
+  mapRouteConclusionToAdjustmentRequirements,
+  TEACHING_NOTE as VEHICLE_ADJUSTMENT_TEACHING_NOTE,
+} from '../../domain/vehicleAdjustmentRequirement'
+import {
+  createVehicleAdjustmentDraft,
+  applyTractorCountAdjustment,
+  applySuspensionHeightAdjustment,
+  resetVehicleAdjustmentDraft,
+  recalculateAfterVehicleAdjustment,
+  createVehicleAdjustmentOperationLog,
+  TRACTOR_COUNT_MIN,
+  TRACTOR_COUNT_MAX,
+  SUSPENSION_HEIGHT_STEP,
+  TEACHING_NOTE as DRAFT_TEACHING_NOTE,
+  type VehicleAdjustmentDraft,
+  type VehicleAdjustmentOperationLog,
+} from '../../domain/vehicleAdjustmentDraft'
 import { useRouteSurveyStore } from '../../stores/route-survey/routeSurveyStore'
 
 export default function RouteSurveyPage() {
@@ -309,6 +327,22 @@ export default function RouteSurveyPage() {
       >
         <h2>路线建议汇总</h2>
         <RouteRecommendationPanel routes={routes} />
+      </section>
+
+      <section
+        data-testid="vehicle-adjustment-requirement-section"
+        style={{ marginTop: '20px' }}
+      >
+        <h2>车组调整要求</h2>
+        <VehicleAdjustmentRequirementPanel routes={routes} />
+      </section>
+
+      <section
+        data-testid="tractor-suspension-adjustment-section"
+        style={{ marginTop: '20px' }}
+      >
+        <h2>车组调整</h2>
+        <TractorAndSuspensionAdjustmentPanel routes={routes} />
       </section>
 
       <div style={teachingNoteStyle}>
@@ -2900,6 +2934,868 @@ function RouteRecommendationPanel({ routes }: { routes: SurveyRoute[] }) {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+function VehicleAdjustmentRequirementPanel({
+  routes,
+}: {
+  routes: SurveyRoute[]
+}) {
+  const summaries = useMemo(() => {
+    const results: RouteRecommendationResult[] = routes.map((route) => {
+      const obstacleSummaries: ObstacleConclusionSummary[] =
+        route.obstacles.map((obs) => createNotCheckedSummary(route.id, obs))
+      return buildRouteRecommendation(route, obstacleSummaries)
+    })
+    return results.map(mapRouteConclusionToAdjustmentRequirements)
+  }, [routes])
+
+  const categoryLabels: Record<string, string> = {
+    height_clearance: '高度通过',
+    slope_traction: '坡道牵引力',
+    axle_load_distribution: '轴载分布',
+    route_selection: '路线选择',
+    data_completion: '数据补充',
+    teaching_review: '教学复习',
+  }
+
+  const categoryColors: Record<string, string> = {
+    height_clearance: '#1565c0',
+    slope_traction: '#f57c00',
+    axle_load_distribution: '#d32f2f',
+    route_selection: '#2e7d32',
+    data_completion: '#757575',
+    teaching_review: '#9c27b0',
+  }
+
+  const statusLabels: Record<string, string> = {
+    required: '必须调整',
+    recommended: '建议调整',
+    blocked: '需补充数据',
+    not_applicable: '不适用',
+  }
+
+  const statusColors: Record<string, string> = {
+    required: '#d32f2f',
+    recommended: '#f57c00',
+    blocked: '#757575',
+    not_applicable: '#bdbdbd',
+  }
+
+  return (
+    <div data-testid="vehicle-adjustment-panel" style={rulePanelStyle}>
+      <div
+        data-testid="vehicle-adjustment-teaching-note"
+        style={{
+          padding: '8px',
+          background: '#fff3e0',
+          borderRadius: '4px',
+          fontSize: '12px',
+          marginBottom: '12px',
+          fontWeight: 'bold',
+        }}
+      >
+        {VEHICLE_ADJUSTMENT_TEACHING_NOTE}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {summaries.map((summary) => (
+          <div
+            key={summary.routeId}
+            data-testid={`vehicle-adjustment-${summary.routeId}`}
+            style={{
+              padding: '12px',
+              border: '1px solid #e0e0e0',
+              borderRadius: '8px',
+              background: '#fff',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px',
+              }}
+            >
+              <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+                {summary.routeName}
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '8px',
+                  fontSize: '12px',
+                }}
+              >
+                <span style={{ color: '#d32f2f' }}>
+                  必须: {summary.requiredCount}
+                </span>
+                <span style={{ color: '#f57c00' }}>
+                  建议: {summary.recommendedCount}
+                </span>
+                <span style={{ color: '#757575' }}>
+                  待补充: {summary.blockedCount}
+                </span>
+              </div>
+            </div>
+            <div
+              data-testid={`vehicle-adjustment-summary-${summary.routeId}`}
+              style={{ fontSize: '13px', marginBottom: '8px' }}
+            >
+              {summary.summary}
+            </div>
+            {summary.requirements.length > 0 ? (
+              <div style={{ marginBottom: '8px' }}>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    marginBottom: '4px',
+                  }}
+                >
+                  调整要求清单：
+                </div>
+                {summary.requirements.map((req) => (
+                  <div
+                    key={req.id}
+                    data-testid={`adjustment-requirement-${req.id}`}
+                    style={{
+                      padding: '8px',
+                      marginLeft: '8px',
+                      marginBottom: '6px',
+                      borderLeft: `3px solid ${categoryColors[req.category]}`,
+                      fontSize: '12px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <div style={{ fontWeight: 'bold' }}>{req.title}</div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '6px',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span
+                          style={{
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: categoryColors[req.category],
+                            color: '#fff',
+                            fontSize: '11px',
+                          }}
+                        >
+                          {categoryLabels[req.category]}
+                        </span>
+                        <span
+                          data-testid={`requirement-status-${req.id}`}
+                          style={{
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: statusColors[req.status],
+                            color: '#fff',
+                            fontSize: '11px',
+                          }}
+                        >
+                          {statusLabels[req.status]}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ color: '#666', marginTop: '4px' }}>
+                      来源: {req.obstacleName} ({req.sourceRuleId})
+                    </div>
+                    <div style={{ color: '#666', marginTop: '2px' }}>
+                      原因: {req.reason}
+                    </div>
+                    <div style={{ color: '#1565c0', marginTop: '2px' }}>
+                      建议: {req.suggestedChange}
+                    </div>
+                    {req.nextStepDay && (
+                      <div
+                        data-testid={`requirement-next-day-${req.id}`}
+                        style={{
+                          color: '#9c27b0',
+                          marginTop: '2px',
+                          fontWeight: 'bold',
+                        }}
+                      >
+                        后续处理: Day{req.nextStepDay}
+                      </div>
+                    )}
+                    {!req.enabledInDay71 && (
+                      <div
+                        style={{
+                          color: '#757575',
+                          marginTop: '2px',
+                          fontStyle: 'italic',
+                        }}
+                      >
+                        (Day71仅生成要求，不执行调整)
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                data-testid={`no-adjustment-${summary.routeId}`}
+                style={{
+                  padding: '8px',
+                  background: '#e8f5e9',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  color: '#2e7d32',
+                }}
+              >
+                暂无车组调整要求
+              </div>
+            )}
+            <div
+              data-testid={`vehicle-adjustment-next-action-${summary.routeId}`}
+              style={{ fontSize: '12px', color: '#1565c0' }}
+            >
+              下一步：{summary.nextAction}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function TractorAndSuspensionAdjustmentPanel({
+  routes,
+}: {
+  routes: SurveyRoute[]
+}) {
+  const [drafts, setDrafts] = useState<VehicleAdjustmentDraft[]>([])
+  const [logs, setLogs] = useState<VehicleAdjustmentOperationLog[]>([])
+
+  const summaries = useMemo(() => {
+    const results: RouteRecommendationResult[] = routes.map((route) => {
+      const obstacleSummaries: ObstacleConclusionSummary[] =
+        route.obstacles.map((obs) => createNotCheckedSummary(route.id, obs))
+      return buildRouteRecommendation(route, obstacleSummaries)
+    })
+    return results.map(mapRouteConclusionToAdjustmentRequirements)
+  }, [routes])
+
+  const slopeRequirements = useMemo(() => {
+    return summaries.flatMap((s) =>
+      s.requirements
+        .filter((r) => r.actionType === 'increase_tractor_count')
+        .map((r) => ({ ...r, routeName: s.routeName })),
+    )
+  }, [summaries])
+
+  const heightRequirements = useMemo(() => {
+    return summaries.flatMap((s) =>
+      s.requirements
+        .filter((r) => r.actionType === 'adjust_suspension_height')
+        .map((r) => ({ ...r, routeName: s.routeName })),
+    )
+  }, [summaries])
+
+  const handleCreateSlopeDraft = (req: (typeof slopeRequirements)[0]) => {
+    const existing = drafts.find((d) => d.sourceRequirementId === req.id)
+    if (existing) return
+
+    const draft = createVehicleAdjustmentDraft({
+      routeId: req.routeId,
+      routeName: req.routeName,
+      sourceRequirementId: req.id,
+      sourceObstacleId: req.obstacleId,
+      sourceRuleId: 'slope_traction',
+      adjustmentType: 'increase_tractor_count',
+      before: {
+        tractorCount: 2,
+        tractionForcePerTractorKN: 300,
+        slopePercent: 8,
+        totalMassT: 200,
+        drivetrainEfficiency: 0.85,
+        rollingResistanceCoefficient: 0.015,
+      },
+    })
+    setDrafts((prev) => [...prev, draft])
+    setLogs((prev) => [
+      ...prev,
+      createVehicleAdjustmentOperationLog({
+        routeId: req.routeId,
+        requirementId: req.id,
+        action: 'view_adjustment_requirement',
+        message: `查看坡度调整要求: ${req.title}`,
+      }),
+    ])
+  }
+
+  const handleCreateHeightDraft = (req: (typeof heightRequirements)[0]) => {
+    const existing = drafts.find((d) => d.sourceRequirementId === req.id)
+    if (existing) return
+
+    const draft = createVehicleAdjustmentDraft({
+      routeId: req.routeId,
+      routeName: req.routeName,
+      sourceRequirementId: req.id,
+      sourceObstacleId: req.obstacleId,
+      sourceRuleId: 'height_clearance',
+      adjustmentType: 'adjust_suspension_height',
+      before: {
+        totalTransportHeightM: 4.5,
+        measuredClearanceHeightM: 4.2,
+        safetyMarginM: 0.1,
+      },
+    })
+    setDrafts((prev) => [...prev, draft])
+    setLogs((prev) => [
+      ...prev,
+      createVehicleAdjustmentOperationLog({
+        routeId: req.routeId,
+        requirementId: req.id,
+        action: 'view_adjustment_requirement',
+        message: `查看高度调整要求: ${req.title}`,
+      }),
+    ])
+  }
+
+  const handleTractorChange = (draftId: string, delta: number) => {
+    setDrafts((prev) =>
+      prev.map((d) => {
+        if (d.id !== draftId) return d
+        const current = d.after.tractorCount ?? d.before.tractorCount ?? 2
+        const next = current + delta
+        const { draft: updated, errors } = applyTractorCountAdjustment(d, next)
+        if (errors.length > 0) return d
+        setLogs((prevLogs) => [
+          ...prevLogs,
+          createVehicleAdjustmentOperationLog({
+            routeId: d.routeId,
+            requirementId: d.sourceRequirementId,
+            action: 'change_tractor_count',
+            beforeValue: String(current),
+            afterValue: String(next),
+            message: `牵引车数量从${current}调整为${next}`,
+          }),
+        ])
+        return updated
+      }),
+    )
+  }
+
+  const handleSuspensionChange = (draftId: string, adjustM: number) => {
+    setDrafts((prev) =>
+      prev.map((d) => {
+        if (d.id !== draftId) return d
+        const currentHeight = d.before.totalTransportHeightM ?? 4.5
+        const { draft: updated, errors } = applySuspensionHeightAdjustment(
+          d,
+          adjustM,
+        )
+        if (errors.length > 0) return d
+        const newHeight = updated.after.totalTransportHeightM ?? currentHeight
+        setLogs((prevLogs) => [
+          ...prevLogs,
+          createVehicleAdjustmentOperationLog({
+            routeId: d.routeId,
+            requirementId: d.sourceRequirementId,
+            action: 'change_suspension_height',
+            beforeValue: `${currentHeight.toFixed(2)}m`,
+            afterValue: `${newHeight.toFixed(2)}m`,
+            message: `运输总高度从${currentHeight.toFixed(2)}m调整为${newHeight.toFixed(2)}m`,
+          }),
+        ])
+        return updated
+      }),
+    )
+  }
+
+  const handleRecalculate = (draftId: string) => {
+    setDrafts((prev) =>
+      prev.map((d) => {
+        if (d.id !== draftId) return d
+        const result = recalculateAfterVehicleAdjustment(d)
+        setLogs((prevLogs) => [
+          ...prevLogs,
+          createVehicleAdjustmentOperationLog({
+            routeId: d.routeId,
+            requirementId: d.sourceRequirementId,
+            action: 'run_recalculation',
+            ruleId: d.sourceRuleId,
+            resultStatus: result.recalculationStatus,
+            message: `重新计算${d.sourceRuleId}规则，结果: ${result.recalculationStatus}`,
+          }),
+        ])
+        return result
+      }),
+    )
+  }
+
+  const handleReset = (draftId: string) => {
+    setDrafts((prev) =>
+      prev.map((d) => {
+        if (d.id !== draftId) return d
+        setLogs((prevLogs) => [
+          ...prevLogs,
+          createVehicleAdjustmentOperationLog({
+            routeId: d.routeId,
+            requirementId: d.sourceRequirementId,
+            action: 'reset_adjustment',
+            message: '重置调整',
+          }),
+        ])
+        return resetVehicleAdjustmentDraft(d)
+      }),
+    )
+  }
+
+  const recalcColors: Record<string, string> = {
+    not_run: '#757575',
+    pass: '#2e7d32',
+    pass_with_warning: '#f57c00',
+    fail: '#d32f2f',
+    blocked: '#f57c00',
+  }
+
+  const recalcLabels: Record<string, string> = {
+    not_run: '待重新计算',
+    pass: '通过',
+    pass_with_warning: '边界通过',
+    fail: '不通过',
+    blocked: '缺参数',
+  }
+
+  return (
+    <div data-testid="tractor-suspension-panel" style={rulePanelStyle}>
+      <div
+        data-testid="tractor-suspension-teaching-note"
+        style={{
+          padding: '8px',
+          background: '#fff3e0',
+          borderRadius: '4px',
+          fontSize: '12px',
+          marginBottom: '12px',
+          fontWeight: 'bold',
+        }}
+      >
+        {DRAFT_TEACHING_NOTE}
+      </div>
+
+      <div
+        style={{
+          padding: '8px',
+          background: '#e3f2fd',
+          borderRadius: '4px',
+          fontSize: '12px',
+          marginBottom: '16px',
+        }}
+      >
+        <strong>Day72 范围说明：</strong>
+        本页面只实现增加牵引车和悬架高度调整，不实现挂车轴线/纵列拼接（Day73）、液压支撑编点（Day74）、阀门开关（Day75）和轴线载荷重新选择（Day76）。
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <h3 style={{ fontSize: '14px', marginBottom: '8px' }}>
+          坡度牵引力问题 — 增加牵引车
+        </h3>
+        {slopeRequirements.length === 0 ? (
+          <div
+            style={{
+              padding: '8px',
+              background: '#e8f5e9',
+              borderRadius: '4px',
+              fontSize: '12px',
+            }}
+          >
+            暂无坡度牵引力调整要求
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+            }}
+          >
+            {slopeRequirements.map((req) => {
+              const draft = drafts.find((d) => d.sourceRequirementId === req.id)
+              return (
+                <div
+                  key={req.id}
+                  data-testid={`slope-adjustment-${req.id}`}
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '8px',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 'bold',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {req.title}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      color: '#666',
+                      marginBottom: '8px',
+                    }}
+                  >
+                    来源: {req.obstacleName} ({req.sourceRuleId})
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      color: '#666',
+                      marginBottom: '8px',
+                    }}
+                  >
+                    原因: {req.reason}
+                  </div>
+                  {!draft ? (
+                    <button
+                      data-testid={`btn-create-slope-draft-${req.id}`}
+                      onClick={() => handleCreateSlopeDraft(req)}
+                      style={saveBtnStyle}
+                    >
+                      开始调整
+                    </button>
+                  ) : (
+                    <div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '12px',
+                          marginBottom: '8px',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <div>
+                          <strong>当前牵引车:</strong>{' '}
+                          {draft.before.tractorCount} 台
+                        </div>
+                        <div>
+                          <strong>单车牵引力:</strong>{' '}
+                          {draft.before.tractionForcePerTractorKN} kN
+                        </div>
+                        <div>
+                          <strong>调整后:</strong>{' '}
+                          {draft.after.tractorCount ??
+                            draft.before.tractorCount}{' '}
+                          台
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '8px',
+                          marginBottom: '8px',
+                        }}
+                      >
+                        <button
+                          data-testid={`btn-decrease-tractor-${draft.id}`}
+                          onClick={() => handleTractorChange(draft.id, -1)}
+                          disabled={
+                            (draft.after.tractorCount ??
+                              draft.before.tractorCount ??
+                              2) <= TRACTOR_COUNT_MIN
+                          }
+                          style={clearBtnStyle}
+                        >
+                          减少
+                        </button>
+                        <button
+                          data-testid={`btn-increase-tractor-${draft.id}`}
+                          onClick={() => handleTractorChange(draft.id, 1)}
+                          disabled={
+                            (draft.after.tractorCount ??
+                              draft.before.tractorCount ??
+                              2) >= TRACTOR_COUNT_MAX
+                          }
+                          style={saveBtnStyle}
+                        >
+                          增加牵引车
+                        </button>
+                        <button
+                          data-testid={`btn-recalc-slope-${draft.id}`}
+                          onClick={() => handleRecalculate(draft.id)}
+                          style={saveBtnStyle}
+                        >
+                          重新计算
+                        </button>
+                        <button
+                          data-testid={`btn-reset-slope-${draft.id}`}
+                          onClick={() => handleReset(draft.id)}
+                          style={clearBtnStyle}
+                        >
+                          重置
+                        </button>
+                      </div>
+                      <div
+                        data-testid={`slope-recalc-status-${draft.id}`}
+                        style={{
+                          padding: '8px',
+                          borderRadius: '4px',
+                          background:
+                            recalcColors[draft.recalculationStatus] + '20',
+                          borderLeft: `3px solid ${recalcColors[draft.recalculationStatus]}`,
+                          fontSize: '12px',
+                        }}
+                      >
+                        <div>
+                          <strong>重新计算状态:</strong>{' '}
+                          {recalcLabels[draft.recalculationStatus]}
+                        </div>
+                        {draft.recalculationResult && (
+                          <div style={{ marginTop: '4px' }}>
+                            <div>
+                              有效牵引力:{' '}
+                              {draft.recalculationResult.effectiveTractionKN?.toFixed(
+                                2,
+                              )}{' '}
+                              kN
+                            </div>
+                            <div>
+                              总阻力:{' '}
+                              {draft.recalculationResult.totalResistanceKN?.toFixed(
+                                2,
+                              )}{' '}
+                              kN
+                            </div>
+                            <div>{draft.recalculationResult.summary}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <h3 style={{ fontSize: '14px', marginBottom: '8px' }}>
+          高度通过性问题 — 悬架高度调整
+        </h3>
+        {heightRequirements.length === 0 ? (
+          <div
+            style={{
+              padding: '8px',
+              background: '#e8f5e9',
+              borderRadius: '4px',
+              fontSize: '12px',
+            }}
+          >
+            暂无高度通过性调整要求
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+            }}
+          >
+            {heightRequirements.map((req) => {
+              const draft = drafts.find((d) => d.sourceRequirementId === req.id)
+              return (
+                <div
+                  key={req.id}
+                  data-testid={`height-adjustment-${req.id}`}
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '8px',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 'bold',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {req.title}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      color: '#666',
+                      marginBottom: '8px',
+                    }}
+                  >
+                    来源: {req.obstacleName} ({req.sourceRuleId})
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      color: '#666',
+                      marginBottom: '8px',
+                    }}
+                  >
+                    原因: {req.reason}
+                  </div>
+                  {!draft ? (
+                    <button
+                      data-testid={`btn-create-height-draft-${req.id}`}
+                      onClick={() => handleCreateHeightDraft(req)}
+                      style={saveBtnStyle}
+                    >
+                      开始调整
+                    </button>
+                  ) : (
+                    <div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '12px',
+                          marginBottom: '8px',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <div>
+                          <strong>当前运输总高度:</strong>{' '}
+                          {draft.before.totalTransportHeightM?.toFixed(2)} m
+                        </div>
+                        <div>
+                          <strong>限高:</strong>{' '}
+                          {draft.before.measuredClearanceHeightM?.toFixed(2)} m
+                        </div>
+                        <div>
+                          <strong>调整后:</strong>{' '}
+                          {draft.after.totalTransportHeightM?.toFixed(2) ??
+                            draft.before.totalTransportHeightM?.toFixed(2)}{' '}
+                          m
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '8px',
+                          marginBottom: '8px',
+                        }}
+                      >
+                        <button
+                          data-testid={`btn-lower-height-${draft.id}`}
+                          onClick={() =>
+                            handleSuspensionChange(
+                              draft.id,
+                              -SUSPENSION_HEIGHT_STEP,
+                            )
+                          }
+                          style={saveBtnStyle}
+                        >
+                          降低 0.05m
+                        </button>
+                        <button
+                          data-testid={`btn-raise-height-${draft.id}`}
+                          onClick={() =>
+                            handleSuspensionChange(
+                              draft.id,
+                              SUSPENSION_HEIGHT_STEP,
+                            )
+                          }
+                          style={clearBtnStyle}
+                        >
+                          升高 0.05m
+                        </button>
+                        <button
+                          data-testid={`btn-recalc-height-${draft.id}`}
+                          onClick={() => handleRecalculate(draft.id)}
+                          style={saveBtnStyle}
+                        >
+                          重新计算
+                        </button>
+                        <button
+                          data-testid={`btn-reset-height-${draft.id}`}
+                          onClick={() => handleReset(draft.id)}
+                          style={clearBtnStyle}
+                        >
+                          重置
+                        </button>
+                      </div>
+                      <div
+                        data-testid={`height-recalc-status-${draft.id}`}
+                        style={{
+                          padding: '8px',
+                          borderRadius: '4px',
+                          background:
+                            recalcColors[draft.recalculationStatus] + '20',
+                          borderLeft: `3px solid ${recalcColors[draft.recalculationStatus]}`,
+                          fontSize: '12px',
+                        }}
+                      >
+                        <div>
+                          <strong>重新计算状态:</strong>{' '}
+                          {recalcLabels[draft.recalculationStatus]}
+                        </div>
+                        {draft.recalculationResult && (
+                          <div style={{ marginTop: '4px' }}>
+                            <div>
+                              运输总高度:{' '}
+                              {draft.recalculationResult.totalTransportHeightM?.toFixed(
+                                2,
+                              )}{' '}
+                              m
+                            </div>
+                            <div>
+                              限高:{' '}
+                              {draft.recalculationResult.clearanceHeightM?.toFixed(
+                                2,
+                              )}{' '}
+                              m
+                            </div>
+                            <div>{draft.recalculationResult.summary}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {logs.length > 0 && (
+        <div>
+          <h3 style={{ fontSize: '14px', marginBottom: '8px' }}>操作日志</h3>
+          <div
+            data-testid="adjustment-operation-logs"
+            style={{
+              maxHeight: '200px',
+              overflowY: 'auto',
+              fontSize: '11px',
+              background: '#f5f5f5',
+              padding: '8px',
+              borderRadius: '4px',
+            }}
+          >
+            {logs.map((log) => (
+              <div
+                key={log.id}
+                style={{
+                  padding: '2px 0',
+                  borderBottom: '1px solid #e0e0e0',
+                }}
+              >
+                [{log.createdAt}] {log.message}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
