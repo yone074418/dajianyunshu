@@ -43,6 +43,14 @@ import {
   type CircularCurveClearanceInput,
   type CircularCurveClearanceResult,
 } from '../../domain/circularCurveClearance'
+import {
+  createNotCheckedSummary,
+  buildRouteRecommendation,
+  rankRouteRecommendations,
+  type ObstacleConclusionSummary,
+  type RouteRecommendationResult,
+  TEACHING_NOTE,
+} from '../../domain/routeRecommendation'
 import { useRouteSurveyStore } from '../../stores/route-survey/routeSurveyStore'
 
 export default function RouteSurveyPage() {
@@ -239,6 +247,14 @@ export default function RouteSurveyPage() {
           />
         </section>
       )}
+
+      <section
+        data-testid="route-recommendation-section"
+        style={{ marginTop: '20px' }}
+      >
+        <h2>路线建议汇总</h2>
+        <RouteRecommendationPanel routes={routes} />
+      </section>
 
       <div style={teachingNoteStyle}>
         <strong>教学简化声明：</strong>
@@ -2061,6 +2077,168 @@ function CircularCurvePanel({
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+function RouteRecommendationPanel({ routes }: { routes: SurveyRoute[] }) {
+  const recommendations = useMemo(() => {
+    const results: RouteRecommendationResult[] = routes.map((route) => {
+      const obstacleSummaries: ObstacleConclusionSummary[] =
+        route.obstacles.map((obs) => createNotCheckedSummary(route.id, obs))
+      return buildRouteRecommendation(route, obstacleSummaries)
+    })
+    return rankRouteRecommendations(results)
+  }, [routes])
+
+  const statusLabels: Record<string, string> = {
+    recommended: '推荐',
+    available_with_warnings: '可用（有警告）',
+    needs_modification: '需调整',
+    blocked: '不可通行',
+    incomplete: '未完成检查',
+  }
+
+  const statusColors: Record<string, string> = {
+    recommended: '#2e7d32',
+    available_with_warnings: '#f57c00',
+    needs_modification: '#d32f2f',
+    blocked: '#b71c1c',
+    incomplete: '#757575',
+  }
+
+  return (
+    <div data-testid="route-recommendation-panel" style={rulePanelStyle}>
+      <div
+        data-testid="route-recommendation-teaching-note"
+        style={{
+          padding: '8px',
+          background: '#fff3e0',
+          borderRadius: '4px',
+          fontSize: '12px',
+          marginBottom: '12px',
+          fontWeight: 'bold',
+        }}
+      >
+        {TEACHING_NOTE}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {recommendations.map((rec, index) => (
+          <div
+            key={rec.routeId}
+            data-testid={`route-recommendation-${rec.routeId}`}
+            style={{
+              padding: '12px',
+              border: `2px solid ${statusColors[rec.finalStatus]}`,
+              borderRadius: '8px',
+              background: '#fff',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px',
+              }}
+            >
+              <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+                #{index + 1} {rec.routeName}
+              </div>
+              <div
+                data-testid={`route-status-${rec.routeId}`}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  background: statusColors[rec.finalStatus],
+                  color: '#fff',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                }}
+              >
+                {statusLabels[rec.finalStatus]}
+              </div>
+            </div>
+            <div
+              data-testid={`route-summary-${rec.routeId}`}
+              style={{ fontSize: '13px', marginBottom: '8px' }}
+            >
+              {rec.summary}
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                gap: '8px',
+                fontSize: '12px',
+                marginBottom: '8px',
+              }}
+            >
+              <span style={{ color: '#2e7d32' }}>通过: {rec.passCount}</span>
+              <span style={{ color: '#f57c00' }}>警告: {rec.warningCount}</span>
+              <span style={{ color: '#d32f2f' }}>不通过: {rec.failCount}</span>
+              <span style={{ color: '#757575' }}>
+                未检查: {rec.notCheckedCount + rec.blockedCount}
+              </span>
+            </div>
+            {rec.obstacleSummaries.length > 0 && (
+              <div style={{ marginBottom: '8px' }}>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    marginBottom: '4px',
+                  }}
+                >
+                  障碍清单：
+                </div>
+                {rec.obstacleSummaries.map((obs) => (
+                  <div
+                    key={obs.obstacleId}
+                    data-testid={`obstacle-${obs.obstacleId}`}
+                    style={{
+                      padding: '6px 8px',
+                      marginLeft: '8px',
+                      marginBottom: '4px',
+                      borderLeft: `3px solid ${obs.severity === 'info' ? '#2e7d32' : obs.severity === 'warning' ? '#f57c00' : '#d32f2f'}`,
+                      fontSize: '12px',
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold' }}>{obs.obstacleName}</div>
+                    <div style={{ color: '#666' }}>{obs.reason}</div>
+                    {obs.editableItems.length > 0 && (
+                      <div style={{ marginTop: '4px', color: '#1565c0' }}>
+                        可修改项：
+                        {obs.editableItems.map((item) => (
+                          <span
+                            key={item.id}
+                            style={{
+                              marginLeft: '4px',
+                              padding: '2px 4px',
+                              background: item.enabledInCurrentStep
+                                ? '#e3f2fd'
+                                : '#f5f5f5',
+                              borderRadius: '2px',
+                              fontSize: '11px',
+                            }}
+                          >
+                            {item.label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div
+              data-testid={`route-next-action-${rec.routeId}`}
+              style={{ fontSize: '12px', color: '#1565c0' }}
+            >
+              下一步：{rec.nextAction}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
