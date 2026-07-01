@@ -43,6 +43,30 @@ import {
   type CircularCurveClearanceInput,
   type CircularCurveClearanceResult,
 } from '../../domain/circularCurveClearance'
+import {
+  evaluateRightAngleCurveClearance,
+  type RightAngleCurveClearanceInput,
+  type RightAngleCurveClearanceResult,
+} from '../../domain/rightAngleCurveClearance'
+import {
+  evaluateSlopeTraction,
+  type SlopeTractionInput,
+  type SlopeTractionRuleResult,
+} from '../../domain/slopeTraction'
+import {
+  evaluateBridgeBearing,
+  type BridgeBearingInput,
+  type BridgeBearingRuleResult,
+  TEACHING_SIMPLIFICATION_NOTICE,
+} from '../../domain/bridgeBearing'
+import {
+  createNotCheckedSummary,
+  buildRouteRecommendation,
+  rankRouteRecommendations,
+  type ObstacleConclusionSummary,
+  type RouteRecommendationResult,
+  TEACHING_NOTE,
+} from '../../domain/routeRecommendation'
 import { useRouteSurveyStore } from '../../stores/route-survey/routeSurveyStore'
 
 export default function RouteSurveyPage() {
@@ -239,6 +263,53 @@ export default function RouteSurveyPage() {
           />
         </section>
       )}
+
+      {selectedObstacle && selectedObstacle.type === 'curve' && (
+        <section
+          data-testid="right-angle-curve-section"
+          style={{ marginTop: '20px' }}
+        >
+          <h2>直交弯道通过性检查</h2>
+          <RightAngleCurvePanel
+            routeId={currentRouteId}
+            obstacle={selectedObstacle}
+          />
+        </section>
+      )}
+
+      {selectedObstacle && selectedObstacle.type === 'slope' && (
+        <section
+          data-testid="slope-traction-section"
+          style={{ marginTop: '20px' }}
+        >
+          <h2>坡道牵引力检查</h2>
+          <SlopeTractionPanel
+            routeId={currentRouteId}
+            obstacle={selectedObstacle}
+          />
+        </section>
+      )}
+
+      {selectedObstacle && selectedObstacle.type === 'bridge' && (
+        <section
+          data-testid="bridge-bearing-section"
+          style={{ marginTop: '20px' }}
+        >
+          <h2>桥梁承载教学检查</h2>
+          <BridgeBearingPanel
+            routeId={currentRouteId}
+            obstacle={selectedObstacle}
+          />
+        </section>
+      )}
+
+      <section
+        data-testid="route-recommendation-section"
+        style={{ marginTop: '20px' }}
+      >
+        <h2>路线建议汇总</h2>
+        <RouteRecommendationPanel routes={routes} />
+      </section>
 
       <div style={teachingNoteStyle}>
         <strong>教学简化声明：</strong>
@@ -2061,6 +2132,774 @@ function CircularCurvePanel({
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+function RightAngleCurvePanel({
+  routeId,
+  obstacle,
+}: {
+  routeId: string
+  obstacle: RouteObstacle
+}) {
+  const [vehicleLength, setVehicleLength] = useState('16')
+  const [vehicleWidth, setVehicleWidth] = useState('2.55')
+  const [minTurningRadius, setMinTurningRadius] = useState('12')
+  const [curveAngle, setCurveAngle] = useState('90')
+  const [entranceWidth, setEntranceWidth] = useState('')
+  const [exitWidth, setExitWidth] = useState('')
+  const [cornerEffectiveWidth, setCornerEffectiveWidth] = useState('')
+  const [safetyMargin, setSafetyMargin] = useState('0.3')
+  const [result, setResult] = useState<RightAngleCurveClearanceResult | null>(
+    null,
+  )
+
+  const handleEvaluate = () => {
+    const input: RightAngleCurveClearanceInput = {
+      routeId,
+      obstacleId: obstacle.id,
+      obstacleName: obstacle.name,
+      curveKind: 'right_angle_curve',
+      vehicle: {
+        totalLengthM: parseRequiredNumber(vehicleLength),
+        totalWidthM: parseRequiredNumber(vehicleWidth),
+        minTurningRadiusM: parseRequiredNumber(minTurningRadius),
+      },
+      curve: {
+        angleDeg: parseRequiredNumber(curveAngle),
+        entranceWidthM: parseRequiredNumber(entranceWidth),
+        exitWidthM: parseRequiredNumber(exitWidth),
+        cornerEffectiveWidthM: parseOptionalNumber(cornerEffectiveWidth),
+      },
+      safetyMarginM: parseOptionalNumber(safetyMargin) ?? 0,
+      measurementSource: 'manual_input',
+    }
+    setResult(evaluateRightAngleCurveClearance(input))
+  }
+
+  return (
+    <div data-testid="right-angle-curve-panel" style={rulePanelStyle}>
+      <div style={ruleGridStyle}>
+        <label style={formLabelStyle}>
+          <span>车辆总长 (m)</span>
+          <input
+            data-testid="right-angle-vehicle-length"
+            type="number"
+            step="0.01"
+            value={vehicleLength}
+            onChange={(e) => setVehicleLength(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>车辆总宽 (m)</span>
+          <input
+            data-testid="right-angle-vehicle-width"
+            type="number"
+            step="0.01"
+            value={vehicleWidth}
+            onChange={(e) => setVehicleWidth(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>最小转弯半径 (m)</span>
+          <input
+            data-testid="right-angle-min-radius"
+            type="number"
+            step="0.01"
+            value={minTurningRadius}
+            onChange={(e) => setMinTurningRadius(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>弯道夹角 (°)</span>
+          <input
+            data-testid="right-angle-curve-angle"
+            type="number"
+            step="0.01"
+            value={curveAngle}
+            onChange={(e) => setCurveAngle(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>入口宽度 (m)</span>
+          <input
+            data-testid="right-angle-entrance-width"
+            type="number"
+            step="0.01"
+            value={entranceWidth}
+            onChange={(e) => setEntranceWidth(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>出口宽度 (m)</span>
+          <input
+            data-testid="right-angle-exit-width"
+            type="number"
+            step="0.01"
+            value={exitWidth}
+            onChange={(e) => setExitWidth(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>转角有效宽度 (m)</span>
+          <input
+            data-testid="right-angle-corner-width"
+            type="number"
+            step="0.01"
+            value={cornerEffectiveWidth}
+            onChange={(e) => setCornerEffectiveWidth(e.target.value)}
+            style={formInputStyle}
+            placeholder="可选"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>安全余量 (m)</span>
+          <input
+            data-testid="right-angle-safety-margin"
+            type="number"
+            step="0.01"
+            value={safetyMargin}
+            onChange={(e) => setSafetyMargin(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+      </div>
+      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+        <button
+          data-testid="btn-evaluate-right-angle"
+          onClick={handleEvaluate}
+          style={saveBtnStyle}
+        >
+          检查通过性
+        </button>
+        {result && (
+          <button
+            data-testid="btn-clear-right-angle-rule"
+            onClick={() => setResult(null)}
+            style={clearBtnStyle}
+          >
+            清除
+          </button>
+        )}
+      </div>
+      {result && (
+        <div data-testid="right-angle-curve-result" style={ruleResultStyle}>
+          <div data-testid="right-angle-curve-status">
+            status: {result.status}
+          </div>
+          <div data-testid="right-angle-curve-summary">{result.summary}</div>
+          {result.requiredExitWidthM !== undefined && (
+            <div data-testid="right-angle-required-exit-width">
+              所需最小出口宽度: {result.requiredExitWidthM.toFixed(2)} m
+            </div>
+          )}
+          {result.exitWidthMarginM !== undefined && (
+            <div data-testid="right-angle-exit-margin">
+              出口宽度余量: {result.exitWidthMarginM.toFixed(2)} m
+            </div>
+          )}
+          {result.entranceWidthMarginM !== undefined && (
+            <div data-testid="right-angle-entrance-margin">
+              入口宽度余量: {result.entranceWidthMarginM.toFixed(2)} m
+            </div>
+          )}
+          <div
+            data-testid="right-angle-teaching-note"
+            style={{ fontSize: '12px', color: '#1565c0', marginTop: '8px' }}
+          >
+            {result.teachingNote}
+          </div>
+          <div
+            data-testid="right-angle-next-action"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            建议：{result.nextAction}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SlopeTractionPanel({
+  routeId,
+  obstacle,
+}: {
+  routeId: string
+  obstacle: RouteObstacle
+}) {
+  const [slopePercent, setSlopePercent] = useState('')
+  const [totalMassT, setTotalMassT] = useState('200')
+  const [tractorCount, setTractorCount] = useState('2')
+  const [tractionForce, setTractionForce] = useState('300')
+  const [efficiency, setEfficiency] = useState('0.85')
+  const [rollingCoeff, setRollingCoeff] = useState('0.015')
+  const [safetyFactor, setSafetyFactor] = useState('1.1')
+  const [result, setResult] = useState<SlopeTractionRuleResult | null>(null)
+
+  const handleEvaluate = () => {
+    const input: SlopeTractionInput = {
+      routeId,
+      obstacleId: obstacle.id,
+      obstacleName: obstacle.name,
+      slope: {
+        slopePercent: parseOptionalNumber(slopePercent),
+      },
+      vehicle: {
+        totalMassT: parseRequiredNumber(totalMassT),
+        tractorCount: parseInt(tractorCount) || 0,
+        tractionForcePerTractorKN: parseRequiredNumber(tractionForce),
+        drivetrainEfficiency: parseOptionalNumber(efficiency),
+        rollingResistanceCoefficient: parseOptionalNumber(rollingCoeff),
+      },
+      safetyFactor: parseOptionalNumber(safetyFactor),
+      measurementSource: 'manual_input',
+    }
+    setResult(evaluateSlopeTraction(input))
+  }
+
+  return (
+    <div data-testid="slope-traction-panel" style={rulePanelStyle}>
+      <div style={ruleGridStyle}>
+        <label style={formLabelStyle}>
+          <span>坡度 (%)</span>
+          <input
+            data-testid="slope-percent-input"
+            type="number"
+            step="0.01"
+            value={slopePercent}
+            onChange={(e) => setSlopePercent(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>总质量 (t)</span>
+          <input
+            data-testid="slope-total-mass"
+            type="number"
+            step="0.01"
+            value={totalMassT}
+            onChange={(e) => setTotalMassT(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>牵引车数量</span>
+          <input
+            data-testid="slope-tractor-count"
+            type="number"
+            step="1"
+            value={tractorCount}
+            onChange={(e) => setTractorCount(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>单车牵引力 (kN)</span>
+          <input
+            data-testid="slope-traction-force"
+            type="number"
+            step="0.01"
+            value={tractionForce}
+            onChange={(e) => setTractionForce(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>传动效率</span>
+          <input
+            data-testid="slope-efficiency"
+            type="number"
+            step="0.01"
+            value={efficiency}
+            onChange={(e) => setEfficiency(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>滚动阻力系数</span>
+          <input
+            data-testid="slope-rolling-coeff"
+            type="number"
+            step="0.001"
+            value={rollingCoeff}
+            onChange={(e) => setRollingCoeff(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>安全系数</span>
+          <input
+            data-testid="slope-safety-factor"
+            type="number"
+            step="0.01"
+            value={safetyFactor}
+            onChange={(e) => setSafetyFactor(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+      </div>
+      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+        <button
+          data-testid="btn-evaluate-slope"
+          onClick={handleEvaluate}
+          style={saveBtnStyle}
+        >
+          检查牵引力
+        </button>
+        {result && (
+          <button
+            data-testid="btn-clear-slope-rule"
+            onClick={() => setResult(null)}
+            style={clearBtnStyle}
+          >
+            清除
+          </button>
+        )}
+      </div>
+      {result && (
+        <div data-testid="slope-traction-result" style={ruleResultStyle}>
+          <div data-testid="slope-traction-status">
+            状态:{' '}
+            {result.status === 'pass'
+              ? '满足'
+              : result.status === 'pass_with_warning'
+                ? '边界满足'
+                : result.status === 'fail'
+                  ? '不满足'
+                  : '缺参数'}
+          </div>
+          <div data-testid="slope-traction-summary">{result.summary}</div>
+          {result.effectiveTractionKN !== undefined && (
+            <div data-testid="slope-effective-traction">
+              有效牵引力: {result.effectiveTractionKN.toFixed(2)} kN
+            </div>
+          )}
+          {result.gradeResistanceKN !== undefined && (
+            <div data-testid="slope-grade-resistance">
+              坡道阻力: {result.gradeResistanceKN.toFixed(2)} kN
+            </div>
+          )}
+          {result.rollingResistanceKN !== undefined && (
+            <div data-testid="slope-rolling-resistance">
+              滚动阻力: {result.rollingResistanceKN.toFixed(2)} kN
+            </div>
+          )}
+          {result.totalResistanceKN !== undefined && (
+            <div data-testid="slope-total-resistance">
+              总阻力: {result.totalResistanceKN.toFixed(2)} kN
+            </div>
+          )}
+          {result.tractionMarginKN !== undefined && (
+            <div data-testid="slope-traction-margin">
+              牵引力余量: {result.tractionMarginKN.toFixed(2)} kN
+            </div>
+          )}
+          {result.calculationProcess.length > 0 && (
+            <div
+              data-testid="slope-calculation-process"
+              style={{
+                fontSize: '12px',
+                color: '#1565c0',
+                marginTop: '8px',
+                whiteSpace: 'pre-line',
+                background: '#f5f5f5',
+                padding: '8px',
+                borderRadius: '4px',
+              }}
+            >
+              {result.calculationProcess.join('\n')}
+            </div>
+          )}
+          <div
+            data-testid="slope-teaching-note"
+            style={{ fontSize: '12px', color: '#1565c0', marginTop: '8px' }}
+          >
+            {result.teachingNote}
+          </div>
+          <div
+            data-testid="slope-next-action"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            建议：{result.nextAction}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BridgeBearingPanel({
+  routeId,
+  obstacle,
+}: {
+  routeId: string
+  obstacle: RouteObstacle
+}) {
+  const [bridgeName, setBridgeName] = useState(obstacle.name)
+  const [loadLimitT, setLoadLimitT] = useState('')
+  const [totalMassT, setTotalMassT] = useState('180')
+  const [axleLines, setAxleLines] = useState('12')
+  const [singleAxleLineLimitT, setSingleAxleLineLimitT] = useState('18')
+  const [safetyFactor, setSafetyFactor] = useState('1.1')
+  const [result, setResult] = useState<BridgeBearingRuleResult | null>(null)
+
+  const handleEvaluate = () => {
+    const input: BridgeBearingInput = {
+      routeId,
+      obstacleId: obstacle.id,
+      obstacleName: obstacle.name,
+      bridge: {
+        bridgeName,
+        loadLimitT: parseRequiredNumber(loadLimitT),
+        singleAxleLineLimitT: parseOptionalNumber(singleAxleLineLimitT),
+      },
+      vehicle: {
+        totalMassT: parseRequiredNumber(totalMassT),
+        axleLines: parseInt(axleLines) || 0,
+      },
+      safetyFactor: parseOptionalNumber(safetyFactor),
+      measurementSource: 'manual_input',
+    }
+    setResult(evaluateBridgeBearing(input))
+  }
+
+  return (
+    <div data-testid="bridge-bearing-panel" style={rulePanelStyle}>
+      <div style={ruleGridStyle}>
+        <label style={formLabelStyle}>
+          <span>桥梁名称</span>
+          <input
+            data-testid="bearing-bridge-name-input"
+            type="text"
+            value={bridgeName}
+            onChange={(e) => setBridgeName(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>桥梁限载 (t)</span>
+          <input
+            data-testid="bearing-load-limit-input"
+            type="number"
+            step="0.01"
+            value={loadLimitT}
+            onChange={(e) => setLoadLimitT(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>运输总质量 (t)</span>
+          <input
+            data-testid="bearing-total-mass-input"
+            type="number"
+            step="0.01"
+            value={totalMassT}
+            onChange={(e) => setTotalMassT(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>轴线数</span>
+          <input
+            data-testid="bearing-axle-lines-input"
+            type="number"
+            step="1"
+            value={axleLines}
+            onChange={(e) => setAxleLines(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>教学单轴线限值 (t)</span>
+          <input
+            data-testid="bearing-single-axle-limit-input"
+            type="number"
+            step="0.01"
+            value={singleAxleLineLimitT}
+            onChange={(e) => setSingleAxleLineLimitT(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>安全系数</span>
+          <input
+            data-testid="bearing-safety-factor-input"
+            type="number"
+            step="0.01"
+            value={safetyFactor}
+            onChange={(e) => setSafetyFactor(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+      </div>
+      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+        <button
+          data-testid="btn-evaluate-bearing"
+          onClick={handleEvaluate}
+          style={saveBtnStyle}
+        >
+          检查桥梁承载
+        </button>
+        {result && (
+          <button
+            data-testid="btn-clear-bearing-rule"
+            onClick={() => setResult(null)}
+            style={clearBtnStyle}
+          >
+            清除
+          </button>
+        )}
+      </div>
+      {result && (
+        <div data-testid="bridge-bearing-result" style={ruleResultStyle}>
+          <div
+            data-testid="bearing-teaching-notice"
+            style={{
+              padding: '8px',
+              background: '#fff3e0',
+              borderRadius: '4px',
+              fontSize: '12px',
+              marginBottom: '8px',
+              fontWeight: 'bold',
+            }}
+          >
+            {TEACHING_SIMPLIFICATION_NOTICE}
+          </div>
+          <div data-testid="bearing-status">
+            状态:{' '}
+            {result.status === 'pass'
+              ? '通过'
+              : result.status === 'pass_with_warning'
+                ? '边界通过'
+                : result.status === 'fail'
+                  ? '不通过'
+                  : '缺参数'}
+          </div>
+          <div data-testid="bearing-summary">{result.summary}</div>
+          {result.loadLimitT !== undefined && (
+            <div data-testid="bearing-load-limit-value">
+              桥梁限载: {result.loadLimitT.toFixed(2)} t
+            </div>
+          )}
+          {result.totalMassT !== undefined && (
+            <div data-testid="bearing-total-mass-value">
+              运输总质量: {result.totalMassT.toFixed(2)} t
+            </div>
+          )}
+          {result.averageAxleLineLoadT !== undefined && (
+            <div data-testid="bearing-axle-load-value">
+              平均单轴线载荷: {result.averageAxleLineLoadT.toFixed(2)} t/轴线
+            </div>
+          )}
+          {result.singleAxleLineLimitT !== undefined && (
+            <div data-testid="bearing-axle-limit-value">
+              教学单轴线限值: {result.singleAxleLineLimitT.toFixed(2)} t/轴线
+            </div>
+          )}
+          {result.totalLoadMarginT !== undefined && (
+            <div data-testid="bearing-total-margin">
+              总质量余量: {result.totalLoadMarginT.toFixed(2)} t
+            </div>
+          )}
+          {result.axleLoadMarginT !== undefined && (
+            <div data-testid="bearing-axle-margin">
+              轴线载荷余量: {result.axleLoadMarginT.toFixed(2)} t
+            </div>
+          )}
+          {result.calculationProcess.length > 0 && (
+            <div
+              data-testid="bearing-calculation-process"
+              style={{
+                fontSize: '12px',
+                color: '#1565c0',
+                marginTop: '8px',
+                whiteSpace: 'pre-line',
+                background: '#f5f5f5',
+                padding: '8px',
+                borderRadius: '4px',
+              }}
+            >
+              {result.calculationProcess.join('\n')}
+            </div>
+          )}
+          <div
+            data-testid="bearing-next-action"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            建议：{result.nextAction}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RouteRecommendationPanel({ routes }: { routes: SurveyRoute[] }) {
+  const recommendations = useMemo(() => {
+    const results: RouteRecommendationResult[] = routes.map((route) => {
+      const obstacleSummaries: ObstacleConclusionSummary[] =
+        route.obstacles.map((obs) => createNotCheckedSummary(route.id, obs))
+      return buildRouteRecommendation(route, obstacleSummaries)
+    })
+    return rankRouteRecommendations(results)
+  }, [routes])
+
+  const statusLabels: Record<string, string> = {
+    recommended: '推荐',
+    available_with_warnings: '可用（有警告）',
+    needs_modification: '需调整',
+    blocked: '不可通行',
+    incomplete: '未完成检查',
+  }
+
+  const statusColors: Record<string, string> = {
+    recommended: '#2e7d32',
+    available_with_warnings: '#f57c00',
+    needs_modification: '#d32f2f',
+    blocked: '#b71c1c',
+    incomplete: '#757575',
+  }
+
+  return (
+    <div data-testid="route-recommendation-panel" style={rulePanelStyle}>
+      <div
+        data-testid="route-recommendation-teaching-note"
+        style={{
+          padding: '8px',
+          background: '#fff3e0',
+          borderRadius: '4px',
+          fontSize: '12px',
+          marginBottom: '12px',
+          fontWeight: 'bold',
+        }}
+      >
+        {TEACHING_NOTE}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {recommendations.map((rec, index) => (
+          <div
+            key={rec.routeId}
+            data-testid={`route-recommendation-${rec.routeId}`}
+            style={{
+              padding: '12px',
+              border: `2px solid ${statusColors[rec.finalStatus]}`,
+              borderRadius: '8px',
+              background: '#fff',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px',
+              }}
+            >
+              <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+                #{index + 1} {rec.routeName}
+              </div>
+              <div
+                data-testid={`route-status-${rec.routeId}`}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  background: statusColors[rec.finalStatus],
+                  color: '#fff',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                }}
+              >
+                {statusLabels[rec.finalStatus]}
+              </div>
+            </div>
+            <div
+              data-testid={`route-summary-${rec.routeId}`}
+              style={{ fontSize: '13px', marginBottom: '8px' }}
+            >
+              {rec.summary}
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                gap: '8px',
+                fontSize: '12px',
+                marginBottom: '8px',
+              }}
+            >
+              <span style={{ color: '#2e7d32' }}>通过: {rec.passCount}</span>
+              <span style={{ color: '#f57c00' }}>警告: {rec.warningCount}</span>
+              <span style={{ color: '#d32f2f' }}>不通过: {rec.failCount}</span>
+              <span style={{ color: '#757575' }}>
+                未检查: {rec.notCheckedCount + rec.blockedCount}
+              </span>
+            </div>
+            {rec.obstacleSummaries.length > 0 && (
+              <div style={{ marginBottom: '8px' }}>
+                <div
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    marginBottom: '4px',
+                  }}
+                >
+                  障碍清单：
+                </div>
+                {rec.obstacleSummaries.map((obs) => (
+                  <div
+                    key={obs.obstacleId}
+                    data-testid={`obstacle-${obs.obstacleId}`}
+                    style={{
+                      padding: '6px 8px',
+                      marginLeft: '8px',
+                      marginBottom: '4px',
+                      borderLeft: `3px solid ${obs.severity === 'info' ? '#2e7d32' : obs.severity === 'warning' ? '#f57c00' : '#d32f2f'}`,
+                      fontSize: '12px',
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold' }}>{obs.obstacleName}</div>
+                    <div style={{ color: '#666' }}>{obs.reason}</div>
+                    {obs.editableItems.length > 0 && (
+                      <div style={{ marginTop: '4px', color: '#1565c0' }}>
+                        可修改项：
+                        {obs.editableItems.map((item) => (
+                          <span
+                            key={item.id}
+                            style={{
+                              marginLeft: '4px',
+                              padding: '2px 4px',
+                              background: item.enabledInCurrentStep
+                                ? '#e3f2fd'
+                                : '#f5f5f5',
+                              borderRadius: '2px',
+                              fontSize: '11px',
+                            }}
+                          >
+                            {item.label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div
+              data-testid={`route-next-action-${rec.routeId}`}
+              style={{ fontSize: '12px', color: '#1565c0' }}
+            >
+              下一步：{rec.nextAction}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
