@@ -29,14 +29,32 @@
 
 | 文件 | 状态 |
 |---|---|
-| `大件运输虚拟仿真实验教学系统_单人复刻126天计划.md` | 已读取 |
+| `大件运输虚拟仿真实验教学系统_单人复刻126天计划.md` | 已读取，确认Day66任务 |
 | `docs/用户与场景.md` | 已读取 |
 | `docs/六阶段实验主流程.md` | 已读取 |
-| `docs/专业规则目录.md` | 已读取 |
+| `docs/学生端信息架构.md` | 已读取 |
+| `docs/六阶段低保真原型.md` | 已读取 |
+| `docs/通用功能与页面清单.md` | 已读取 |
+| `docs/专业规则目录.md` | 已读取，确认ORT-001/ORT-002规则 |
+| `docs/唯一运输案例说明.md` | 已读取，确认案例参数 |
 | `heavy-transport-sim/docs/day64-height-clearance-rule-verification.md` | 已读取 |
 | `heavy-transport-sim/docs/day65-circular-curve-clearance-rule-verification.md` | 已读取 |
 
-## 5. 实现文件
+## 5. Day57—Day65 前置状态说明
+
+| 前置任务 | 状态 | 说明 |
+|---|---|---|
+| Day57 路线场景与障碍配置 | 已完成，已合并main | 三条路线和障碍点已配置 |
+| Day58 路线切换导航障碍列表 | 已完成，已合并main | 路线切换功能可用 |
+| Day59 距离/高度测量工具 | 已完成，已合并main | 测量工具可用 |
+| Day60 坡度测量工具 | 已完成，已合并main | 坡度测量可用 |
+| Day61 弯道参数测量 | 已完成，已合并main | 弯道参数测量可用 |
+| Day62 桥梁信息查看 | 已完成，已合并main | 桥梁信息可用 |
+| Day63 路线勘测工具验收 | 已完成，已合并main | 工具验收通过 |
+| Day64 高度通过性规则 | 已完成，已合并main | HeightClearancePanel已实现 |
+| Day65 圆弧弯道通过性规则 | 已完成，已合并main | CircularCurvePanel已实现 |
+
+## 6. 实现文件清单
 
 | 文件 | 操作 |
 |---|---|
@@ -45,10 +63,11 @@
 | `src/pages/route-survey/RouteSurveyPage.tsx` | 修改 - 新增RightAngleCurvePanel |
 | `docs/day66-right-angle-curve-clearance-rule-verification.md` | 新增 - 验证记录 |
 
-## 6. 规则引擎
+## 7. 规则引擎
 
 - **输入类型**：`RightAngleCurveClearanceInput`（Zod schema）
 - **输出类型**：`RightAngleCurveClearanceResult`
+- **Schema校验路径**：`src/domain/rightAngleCurveClearance.ts` 中 `rightAngleCurveClearanceInputSchema`
 - **评估函数**：`evaluateRightAngleCurveClearance(input)`
 - **校验函数**：`validateRightAngleCurveInput(input)`
 - **计算函数**：
@@ -57,7 +76,7 @@
   - `calculateExitWidthMargin(input)` - 计算出口宽度余量
 - **格式化函数**：`formatRightAngleCurveReason(result)`
 
-## 7. 教学简化规则
+## 8. 教学简化规则
 
 ```
 所需最小出口宽度 = 车辆总宽 + 安全余量 + 教学简化转弯外摆量
@@ -67,7 +86,7 @@
 角度要求：直交弯道夹角应在 80° 到 100° 的教学范围内
 ```
 
-## 8. 核心验证结果
+## 9. 核心验证结果
 
 ### 出口宽度大于所需最小出口宽度 → 通过
 - 输入：出口宽度 8.0 m，所需最小出口宽度约 6.63 m
@@ -142,7 +161,7 @@
 ### 每个检查都有 reason 和 teachingNote
 - 测试：`every check has reason and teachingNote` ✅
 
-## 9. 页面面板
+## 10. 页面面板
 
 - **路径**：`RouteSurveyPage.tsx` 中 `RightAngleCurvePanel`
 - **触发**：选择 `curve` 类型障碍时显示（与圆弧弯道面板并列）
@@ -158,7 +177,7 @@
   - 检查按钮
   - 结果面板（显示状态、摘要、所需最小出口宽度、出口宽度余量、入口宽度余量、教学说明、建议）
 
-## 10. 人类可读原因验证
+## 11. 人类可读原因验证
 
 ### 通过文案示例
 ```
@@ -175,11 +194,53 @@
 缺少车辆总宽，无法判断直交弯道是否可通过。请先完成弯道参数测量或补充车辆参数。
 ```
 
-## 11. 教学简化声明
+## 12. 边界策略
+
+### 出口宽度边界策略
+- **大于所需**：`status: 'pass'`, `passed: true`
+- **等于所需（误差<0.001m）**：`status: 'pass_with_warning'`, `passed: true`，提示保留余量
+- **小于所需**：`status: 'fail'`, `passed: false`
+
+### 入口宽度边界策略
+- **大于所需**：`status: 'pass'`, `passed: true`
+- **等于所需（误差<0.001m）**：`status: 'pass_with_warning'`, `passed: true`
+- **小于所需**：`status: 'fail'`, `passed: false`
+
+### 转角有效宽度边界策略
+- **大于所需**：`status: 'pass'`, `passed: true`
+- **等于所需（误差<0.001m）**：`status: 'pass_with_warning'`, `passed: true`
+- **小于所需**：`status: 'fail'`, `passed: false`
+
+### 角度范围边界策略
+- **80°-100°**：`status: 'pass'`
+- **偏离5°-10°**：`status: 'pass_with_warning'`
+- **偏离>10°**：`status: 'fail'`
+
+## 13. 非法参数验证证据
+
+| 非法输入 | 结果 | 测试 |
+|---|---|---|
+| `totalLengthM: NaN` | `blocked`，无NaN输出 | `handles NaN without producing NaN in output` ✅ |
+| `exitWidthM: Infinity` | `blocked` | `handles Infinity gracefully` ✅ |
+| `totalLengthM: 0` | `blocked`，reason包含"车辆总长" | `returns blocked when vehicle totalLengthM missing` ✅ |
+| `totalWidthM: -1` | schema校验失败 | `fails for vehicle totalWidthM <= 0` ✅ |
+| `angleDeg: 0` | schema校验失败 | `fails for angleDeg <= 0` ✅ |
+| `angleDeg: 181` | schema校验失败 | `fails for angleDeg > 180` ✅ |
+| `safetyMarginM: -0.1` | schema校验失败 | `fails for safetyMarginM < 0` ✅ |
+
+## 14. 数据来源证明
+
+规则数据不在JSX中硬编码的证据：
+1. 输入类型定义在 `src/domain/rightAngleCurveClearance.ts` 中，使用Zod schema独立定义
+2. 规则计算逻辑在独立的 `evaluateRightAngleCurveClearance()` 函数中
+3. 页面面板 `RightAngleCurvePanel` 仅负责UI渲染和用户交互，调用独立的规则引擎
+4. 所有计算参数通过函数参数传入，不依赖组件内部硬编码值
+
+## 15. 教学简化声明
 
 本规则为教学简化规则，基于车辆总长、总宽和最小转弯半径与直交弯道参数进行比较，不替代真实车辆扫掠轨迹分析。
 
-## 12. 未实现功能声明
+## 16. 未实现功能声明
 
 - **未实现 Day67 坡道牵引力规则**：规则ID为 `right_angle_curve_clearance`，不包含坡道牵引力计算
 - **未实现 Day68 桥梁承载规则**：不包含桥梁承载判断
@@ -187,7 +248,7 @@
 - **未实现真实车辆扫掠轨迹仿真**：仅使用教学简化公式
 - **未实现真实多轴转向动力学计算**：仅使用简化转弯外摆量
 
-## 13. 本地验证结果
+## 17. 本地验证结果
 
 | 命令 | 结果 |
 |---|---|
@@ -198,11 +259,11 @@
 | `build` | ✅ 3.95s |
 | `git diff --check` | ✅ 无空白错误 |
 
-## 14. 新增依赖
+## 18. 新增依赖
 
 无。
 
-## 15. 测试覆盖清单
+## 19. 测试覆盖清单
 
 | 测试场景 | 状态 |
 |---|---|
@@ -235,6 +296,36 @@
 | 页面不实现 Day68—Day69 后续规则 | ✅ |
 | 构建成功 | ✅ |
 
-## 16. 验收结论
+## 20. 本地验证命令结果
+
+| 命令 | 结果 |
+|---|---|
+| `npm run format:check` | ✅ 通过 |
+| `npm run lint` | ✅ 0 errors |
+| `npm run test:run` | ✅ 846 passed (49 files) |
+| `npm run test:e2e` | ✅ 12 passed |
+| `npm run build` | ✅ 3.95s |
+| `git diff --check` | ✅ 无空白错误 |
+
+## 21. 生成物、后台进程、凭据和范围检查
+
+| 检查项 | 结果 |
+|---|---|
+| 后台进程 | 无遗留后台进程 |
+| 凭据泄露 | 未发现真实密钥或凭据 |
+| 范围检查 | 仅修改Day66允许范围内的文件 |
+| .env文件 | 未提交任何.env文件 |
+| node_modules | 未提交 |
+| dist目录 | 未提交 |
+
+## 22. C盘残留检查结果
+
+| 检查项 | 结果 |
+|---|---|
+| Git worktree路径 | 全部在D盘 `D:\Study\大件运输项目工作区\worktrees\` |
+| C盘临时目录 | 未发现项目残留 |
+| 构建产物位置 | 仅在D盘worktree中 |
+
+## 23. 验收结论
 
 Day66 通过。测量值与所需最小出口宽度比较正确。规则引擎实现了完整的输入校验、所需最小出口宽度计算、出口宽度检查、入口宽度检查、转角有效宽度检查、角度范围检查，并产生了人类可读的原因和教学说明。
