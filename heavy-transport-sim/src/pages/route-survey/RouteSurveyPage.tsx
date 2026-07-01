@@ -43,6 +43,11 @@ import {
   type CircularCurveClearanceInput,
   type CircularCurveClearanceResult,
 } from '../../domain/circularCurveClearance'
+import {
+  evaluateRightAngleCurveClearance,
+  type RightAngleCurveClearanceInput,
+  type RightAngleCurveClearanceResult,
+} from '../../domain/rightAngleCurveClearance'
 import { useRouteSurveyStore } from '../../stores/route-survey/routeSurveyStore'
 
 export default function RouteSurveyPage() {
@@ -234,6 +239,19 @@ export default function RouteSurveyPage() {
         >
           <h2>圆弧弯道通过性检查</h2>
           <CircularCurvePanel
+            routeId={currentRouteId}
+            obstacle={selectedObstacle}
+          />
+        </section>
+      )}
+
+      {selectedObstacle && selectedObstacle.type === 'curve' && (
+        <section
+          data-testid="right-angle-curve-section"
+          style={{ marginTop: '20px' }}
+        >
+          <h2>直交弯道通过性检查</h2>
+          <RightAngleCurvePanel
             routeId={currentRouteId}
             obstacle={selectedObstacle}
           />
@@ -2059,6 +2077,198 @@ function CircularCurvePanel({
               width margin: {result.widthMarginM.toFixed(2)} m
             </div>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RightAngleCurvePanel({
+  routeId,
+  obstacle,
+}: {
+  routeId: string
+  obstacle: RouteObstacle
+}) {
+  const [vehicleLength, setVehicleLength] = useState('16')
+  const [vehicleWidth, setVehicleWidth] = useState('2.55')
+  const [minTurningRadius, setMinTurningRadius] = useState('12')
+  const [curveAngle, setCurveAngle] = useState('90')
+  const [entranceWidth, setEntranceWidth] = useState('')
+  const [exitWidth, setExitWidth] = useState('')
+  const [cornerEffectiveWidth, setCornerEffectiveWidth] = useState('')
+  const [safetyMargin, setSafetyMargin] = useState('0.3')
+  const [result, setResult] = useState<RightAngleCurveClearanceResult | null>(
+    null,
+  )
+
+  const handleEvaluate = () => {
+    const input: RightAngleCurveClearanceInput = {
+      routeId,
+      obstacleId: obstacle.id,
+      obstacleName: obstacle.name,
+      curveKind: 'right_angle_curve',
+      vehicle: {
+        totalLengthM: parseRequiredNumber(vehicleLength),
+        totalWidthM: parseRequiredNumber(vehicleWidth),
+        minTurningRadiusM: parseRequiredNumber(minTurningRadius),
+      },
+      curve: {
+        angleDeg: parseRequiredNumber(curveAngle),
+        entranceWidthM: parseRequiredNumber(entranceWidth),
+        exitWidthM: parseRequiredNumber(exitWidth),
+        cornerEffectiveWidthM: parseOptionalNumber(cornerEffectiveWidth),
+      },
+      safetyMarginM: parseOptionalNumber(safetyMargin) ?? 0,
+      measurementSource: 'manual_input',
+    }
+    setResult(evaluateRightAngleCurveClearance(input))
+  }
+
+  return (
+    <div data-testid="right-angle-curve-panel" style={rulePanelStyle}>
+      <div style={ruleGridStyle}>
+        <label style={formLabelStyle}>
+          <span>车辆总长 (m)</span>
+          <input
+            data-testid="right-angle-vehicle-length"
+            type="number"
+            step="0.01"
+            value={vehicleLength}
+            onChange={(e) => setVehicleLength(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>车辆总宽 (m)</span>
+          <input
+            data-testid="right-angle-vehicle-width"
+            type="number"
+            step="0.01"
+            value={vehicleWidth}
+            onChange={(e) => setVehicleWidth(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>最小转弯半径 (m)</span>
+          <input
+            data-testid="right-angle-min-radius"
+            type="number"
+            step="0.01"
+            value={minTurningRadius}
+            onChange={(e) => setMinTurningRadius(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>弯道夹角 (°)</span>
+          <input
+            data-testid="right-angle-curve-angle"
+            type="number"
+            step="0.01"
+            value={curveAngle}
+            onChange={(e) => setCurveAngle(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>入口宽度 (m)</span>
+          <input
+            data-testid="right-angle-entrance-width"
+            type="number"
+            step="0.01"
+            value={entranceWidth}
+            onChange={(e) => setEntranceWidth(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>出口宽度 (m)</span>
+          <input
+            data-testid="right-angle-exit-width"
+            type="number"
+            step="0.01"
+            value={exitWidth}
+            onChange={(e) => setExitWidth(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>转角有效宽度 (m)</span>
+          <input
+            data-testid="right-angle-corner-width"
+            type="number"
+            step="0.01"
+            value={cornerEffectiveWidth}
+            onChange={(e) => setCornerEffectiveWidth(e.target.value)}
+            style={formInputStyle}
+            placeholder="可选"
+          />
+        </label>
+        <label style={formLabelStyle}>
+          <span>安全余量 (m)</span>
+          <input
+            data-testid="right-angle-safety-margin"
+            type="number"
+            step="0.01"
+            value={safetyMargin}
+            onChange={(e) => setSafetyMargin(e.target.value)}
+            style={formInputStyle}
+          />
+        </label>
+      </div>
+      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+        <button
+          data-testid="btn-evaluate-right-angle"
+          onClick={handleEvaluate}
+          style={saveBtnStyle}
+        >
+          检查通过性
+        </button>
+        {result && (
+          <button
+            data-testid="btn-clear-right-angle-rule"
+            onClick={() => setResult(null)}
+            style={clearBtnStyle}
+          >
+            清除
+          </button>
+        )}
+      </div>
+      {result && (
+        <div data-testid="right-angle-curve-result" style={ruleResultStyle}>
+          <div data-testid="right-angle-curve-status">
+            status: {result.status}
+          </div>
+          <div data-testid="right-angle-curve-summary">{result.summary}</div>
+          {result.requiredExitWidthM !== undefined && (
+            <div data-testid="right-angle-required-exit-width">
+              所需最小出口宽度: {result.requiredExitWidthM.toFixed(2)} m
+            </div>
+          )}
+          {result.exitWidthMarginM !== undefined && (
+            <div data-testid="right-angle-exit-margin">
+              出口宽度余量: {result.exitWidthMarginM.toFixed(2)} m
+            </div>
+          )}
+          {result.entranceWidthMarginM !== undefined && (
+            <div data-testid="right-angle-entrance-margin">
+              入口宽度余量: {result.entranceWidthMarginM.toFixed(2)} m
+            </div>
+          )}
+          <div
+            data-testid="right-angle-teaching-note"
+            style={{ fontSize: '12px', color: '#1565c0', marginTop: '8px' }}
+          >
+            {result.teachingNote}
+          </div>
+          <div
+            data-testid="right-angle-next-action"
+            style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}
+          >
+            建议：{result.nextAction}
+          </div>
         </div>
       )}
     </div>
