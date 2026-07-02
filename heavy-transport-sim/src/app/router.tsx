@@ -19,6 +19,7 @@ import ConfigurationTimelinePage from '../pages/teacher/ConfigurationTimelinePag
 import RouteSurveyPage from '../pages/route-survey/RouteSurveyPage'
 import TrailerAxleColumnAssemblyPage from '../pages/trailer-assembly/TrailerAxleColumnAssemblyPage'
 import HydraulicThreePointSelectionPage from '../pages/hydraulic-support/HydraulicThreePointSelectionPage'
+import HydraulicValveCircuitPage from '../pages/hydraulic-valves/HydraulicValveCircuitPage'
 import AuthGuard from './AuthGuard'
 import RoleGuard from './RoleGuard'
 
@@ -149,6 +150,16 @@ export const router = createBrowserRouter([
           <AuthGuard>
             <RoleGuard>
               <HydraulicThreePointSelectionPage />
+            </RoleGuard>
+          </AuthGuard>
+        ),
+      },
+      {
+        path: 'student/hydraulic-valves',
+        element: (
+          <AuthGuard>
+            <RoleGuard>
+              <HydraulicValveCircuitPage />
             </RoleGuard>
           </AuthGuard>
         ),
