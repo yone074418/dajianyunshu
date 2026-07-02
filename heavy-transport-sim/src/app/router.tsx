@@ -18,6 +18,7 @@ import ConfigurationRulePage from '../pages/configuration-rules/ConfigurationRul
 import ConfigurationTimelinePage from '../pages/teacher/ConfigurationTimelinePage'
 import RouteSurveyPage from '../pages/route-survey/RouteSurveyPage'
 import TrailerAxleColumnAssemblyPage from '../pages/trailer-assembly/TrailerAxleColumnAssemblyPage'
+import HydraulicThreePointSelectionPage from '../pages/hydraulic-support/HydraulicThreePointSelectionPage'
 import AuthGuard from './AuthGuard'
 import RoleGuard from './RoleGuard'
 
@@ -138,6 +139,16 @@ export const router = createBrowserRouter([
           <AuthGuard>
             <RoleGuard>
               <TrailerAxleColumnAssemblyPage />
+            </RoleGuard>
+          </AuthGuard>
+        ),
+      },
+      {
+        path: 'student/hydraulic-support',
+        element: (
+          <AuthGuard>
+            <RoleGuard>
+              <HydraulicThreePointSelectionPage />
             </RoleGuard>
           </AuthGuard>
         ),
