@@ -17,6 +17,7 @@ import TrailerSelectionPage from '../pages/trailer-selection/TrailerSelectionPag
 import ConfigurationRulePage from '../pages/configuration-rules/ConfigurationRulePage'
 import ConfigurationTimelinePage from '../pages/teacher/ConfigurationTimelinePage'
 import RouteSurveyPage from '../pages/route-survey/RouteSurveyPage'
+import TrailerAxleColumnAssemblyPage from '../pages/trailer-assembly/TrailerAxleColumnAssemblyPage'
 import AuthGuard from './AuthGuard'
 import RoleGuard from './RoleGuard'
 
@@ -127,6 +128,16 @@ export const router = createBrowserRouter([
           <AuthGuard>
             <RoleGuard>
               <RouteSurveyPage />
+            </RoleGuard>
+          </AuthGuard>
+        ),
+      },
+      {
+        path: 'student/trailer-assembly',
+        element: (
+          <AuthGuard>
+            <RoleGuard>
+              <TrailerAxleColumnAssemblyPage />
             </RoleGuard>
           </AuthGuard>
         ),
